@@ -17,27 +17,29 @@
 #include <memory>
 
 #include "Common/CommonTypes.h"
-#include "Common/File.h"
+#include "Common/FileUtil.h"
+#include "Common/NonCopyable.h"
 
-namespace Common
-{
-class PCAP final
+class PCAP final : public NonCopyable
 {
 public:
-  // Takes ownership of the file object. Assumes the file object is already
-  // opened in write mode.
-  explicit PCAP(File::IOFile* fp) : m_fp(fp) { AddHeader(); }
-  template <typename T>
-  void AddPacket(const T& obj)
-  {
-    AddPacket(reinterpret_cast<const u8*>(&obj), sizeof(obj));
-  }
+	// Takes ownership of the file object. Assumes the file object is already
+	// opened in write mode.
+	explicit PCAP(File::IOFile* fp) : m_fp(fp)
+	{
+		AddHeader();
+	}
 
-  void AddPacket(const u8* bytes, size_t size);
+	template <typename T>
+	void AddPacket(const T& obj)
+	{
+		AddPacket(reinterpret_cast<const u8*>(&obj), sizeof (obj));
+	}
+
+	void AddPacket(const u8* bytes, size_t size);
 
 private:
-  void AddHeader();
+	void AddHeader();
 
-  std::unique_ptr<File::IOFile> m_fp;
+	std::unique_ptr<File::IOFile> m_fp;
 };
-}  // namespace Common

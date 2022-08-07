@@ -4,58 +4,42 @@
 
 #pragma once
 
-#include <memory>
-
 #include "Common/CommonTypes.h"
+#include "Common/Thread.h"
+
+#include "VideoBackends/Software/EfbInterface.h"
 
 #include "VideoCommon/RenderBase.h"
 
-class SWOGLWindow;
-
-namespace SW
-{
 class SWRenderer : public Renderer
 {
 public:
-  SWRenderer(std::unique_ptr<SWOGLWindow> window);
+	~SWRenderer() override;
 
-  bool IsHeadless() const override;
+	static void Init();
+	static void Shutdown();
 
-  std::unique_ptr<AbstractTexture> CreateTexture(const TextureConfig& config) override;
-  std::unique_ptr<AbstractStagingTexture>
-  CreateStagingTexture(StagingTextureType type, const TextureConfig& config) override;
-  std::unique_ptr<AbstractFramebuffer>
-  CreateFramebuffer(AbstractTexture* color_attachment, AbstractTexture* depth_attachment) override;
+	static u8* GetNextColorTexture();
+	static u8* GetCurrentColorTexture();
+	void SwapColorTexture();
+	void UpdateColorTexture(EfbInterface::yuv422_packed *xfb, u32 fbWidth, u32 fbHeight);
 
-  std::unique_ptr<AbstractShader> CreateShaderFromSource(ShaderStage stage,
-                                                         std::string_view source) override;
-  std::unique_ptr<AbstractShader> CreateShaderFromBinary(ShaderStage stage, const void* data,
-                                                         size_t length) override;
-  std::unique_ptr<NativeVertexFormat>
-  CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl) override;
-  std::unique_ptr<AbstractPipeline> CreatePipeline(const AbstractPipelineConfig& config,
-                                                   const void* cache_data = nullptr,
-                                                   size_t cache_data_length = 0) override;
+	void RenderText(const std::string& pstr, int left, int top, u32 color) override;
+	u32 AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data) override;
+	void PokeEFB(EFBAccessType type, const EfbPokeData* points, size_t num_points) override {};
 
-  u32 AccessEFB(EFBAccessType type, u32 x, u32 y, u32 poke_data) override;
-  void PokeEFB(EFBAccessType type, const EfbPokeData* points, size_t num_points) override {}
-  u16 BBoxRead(int index) override;
-  void BBoxWrite(int index, u16 value) override;
+	u16 BBoxRead(int index) override;
+	void BBoxWrite(int index, u16 value) override;
 
-  void RenderXFBToScreen(const MathUtil::Rectangle<int>& target_rc,
-                         const AbstractTexture* source_texture,
-                         const MathUtil::Rectangle<int>& source_rc) override;
+	int GetMaxTextureSize() override { return 16 * 1024; };
 
-  void ClearScreen(const MathUtil::Rectangle<int>& rc, bool colorEnable, bool alphaEnable,
-                   bool zEnable, u32 color, u32 z) override;
+	TargetRectangle ConvertEFBRectangle(const EFBRectangle& rc) override;
 
-  void ReinterpretPixelData(EFBReinterpretType convtype) override {}
+	void SwapImpl(u32 xfbAddr, u32 fbWidth, u32 fbStride, u32 fbHeight, const EFBRectangle& rc, float Gamma) override;
 
-  void ScaleTexture(AbstractFramebuffer* dst_framebuffer, const MathUtil::Rectangle<int>& dst_rect,
-                    const AbstractTexture* src_texture,
-                    const MathUtil::Rectangle<int>& src_rect) override;
+	void ClearScreen(const EFBRectangle& rc, bool colorEnable, bool alphaEnable, bool zEnable, u32 color, u32 z) override;
 
-private:
-  std::unique_ptr<SWOGLWindow> m_window;
+	void ReinterpretPixelData(unsigned int convtype) override {}
+
+	bool SaveScreenshot(const std::string& filename, const TargetRectangle& rc) override { return true; };
 };
-}  // namespace SW

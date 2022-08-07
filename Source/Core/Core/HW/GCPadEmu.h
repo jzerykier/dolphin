@@ -6,61 +6,34 @@
 
 #include <string>
 
-#include "InputCommon/ControllerEmu/ControlGroup/ControlGroup.h"
-#include "InputCommon/ControllerEmu/ControllerEmu.h"
-#include "InputCommon/ControllerEmu/Setting/NumericSetting.h"
+#include "InputCommon/ControllerEmu.h"
 
-struct GCPadStatus;
-
-namespace ControllerEmu
-{
-class AnalogStick;
-class Buttons;
-class MixedTriggers;
-}  // namespace ControllerEmu
-
-enum class PadGroup
-{
-  Buttons,
-  MainStick,
-  CStick,
-  DPad,
-  Triggers,
-  Rumble,
-  Mic,
-  Options
-};
-
-class GCPad : public ControllerEmu::EmulatedController
+class GCPad : public ControllerEmu
 {
 public:
-  explicit GCPad(unsigned int index);
-  GCPadStatus GetInput() const;
-  void SetOutput(const ControlState strength);
 
-  bool GetMicButton() const;
+	GCPad(const unsigned int index);
+	void GetInput(GCPadStatus* const pad);
+	void SetOutput(const ControlState strength);
 
-  std::string GetName() const override;
+	bool GetMicButton() const;
 
-  ControllerEmu::ControlGroup* GetGroup(PadGroup group);
+	std::string GetName() const override;
 
-  void LoadDefaults(const ControllerInterface& ciface) override;
-
-  // Values averaged from multiple genuine GameCube controllers.
-  static constexpr ControlState MAIN_STICK_GATE_RADIUS = 0.7937125;
-  static constexpr ControlState C_STICK_GATE_RADIUS = 0.7221375;
+	void LoadDefaults(const ControllerInterface& ciface) override;
 
 private:
-  ControllerEmu::Buttons* m_buttons;
-  ControllerEmu::AnalogStick* m_main_stick;
-  ControllerEmu::AnalogStick* m_c_stick;
-  ControllerEmu::Buttons* m_dpad;
-  ControllerEmu::MixedTriggers* m_triggers;
-  ControllerEmu::ControlGroup* m_rumble;
-  ControllerEmu::Buttons* m_mic;
-  ControllerEmu::ControlGroup* m_options;
 
-  ControllerEmu::SettingValue<bool> m_always_connected_setting;
+	Buttons*       m_buttons;
+	AnalogStick*   m_main_stick;
+	AnalogStick*   m_c_stick;
+	Buttons*       m_dpad;
+	MixedTriggers* m_triggers;
+	ControlGroup*  m_rumble;
+	ControlGroup*  m_options;
 
-  const unsigned int m_index;
+	const unsigned int m_index;
+
+	// Default analog stick radius for GameCube controllers.
+	static constexpr ControlState DEFAULT_PAD_STICK_RADIUS = 1.0;
 };

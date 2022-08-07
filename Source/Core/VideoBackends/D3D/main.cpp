@@ -5,192 +5,231 @@
 #include <memory>
 #include <string>
 
-#include "Common/Common.h"
 #include "Common/CommonTypes.h"
-#include "Common/MsgHandler.h"
+#include "Common/FileUtil.h"
 #include "Common/StringUtil.h"
+
+#include "Core/ConfigManager.h"
+#include "Core/Host.h"
 
 #include "VideoBackends/D3D/BoundingBox.h"
 #include "VideoBackends/D3D/D3DBase.h"
+#include "VideoBackends/D3D/D3DUtil.h"
+#include "VideoBackends/D3D/GeometryShaderCache.h"
 #include "VideoBackends/D3D/PerfQuery.h"
+#include "VideoBackends/D3D/PixelShaderCache.h"
 #include "VideoBackends/D3D/Render.h"
-#include "VideoBackends/D3D/SwapChain.h"
+#include "VideoBackends/D3D/TextureCache.h"
 #include "VideoBackends/D3D/VertexManager.h"
+#include "VideoBackends/D3D/VertexShaderCache.h"
 #include "VideoBackends/D3D/VideoBackend.h"
-#include "VideoBackends/D3DCommon/Common.h"
 
-#include "VideoCommon/FramebufferManager.h"
-#include "VideoCommon/ShaderCache.h"
-#include "VideoCommon/TextureCacheBase.h"
-#include "VideoCommon/VideoCommon.h"
+#include "VideoCommon/BPStructs.h"
+#include "VideoCommon/CommandProcessor.h"
+#include "VideoCommon/Fifo.h"
+#include "VideoCommon/GeometryShaderManager.h"
+#include "VideoCommon/IndexGenerator.h"
+#include "VideoCommon/OpcodeDecoding.h"
+#include "VideoCommon/PixelEngine.h"
+#include "VideoCommon/PixelShaderManager.h"
+#include "VideoCommon/VertexLoaderManager.h"
+#include "VideoCommon/VertexShaderManager.h"
 #include "VideoCommon/VideoConfig.h"
 
 namespace DX11
 {
-static bool s_create_device = false;
+
+unsigned int VideoBackend::PeekMessages()
+{
+	MSG msg;
+	while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+	{
+		if (msg.message == WM_QUIT)
+			return FALSE;
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+	return TRUE;
+}
 
 std::string VideoBackend::GetName() const
 {
-  return "D3D";
+	return "D3D";
 }
 
 std::string VideoBackend::GetDisplayName() const
 {
-  return _trans("Direct3D 11");
+	return "Direct3D 11";
 }
 
-std::optional<std::string> VideoBackend::GetWarningMessage() const
+void InitBackendInfo()
 {
-  std::optional<std::string> result;
+	HRESULT hr = DX11::D3D::LoadDXGI();
+	if (SUCCEEDED(hr)) hr = DX11::D3D::LoadD3D();
+	if (FAILED(hr))
+	{
+		DX11::D3D::UnloadDXGI();
+		return;
+	}
 
-  // If user is on Win7, show a warning about partial DX11.1 support
-  // This is being called BEFORE FillBackendInfo is called for this backend,
-  // so query for logic op support manually
-  bool supportsLogicOp = false;
-  if (D3DCommon::LoadLibraries())
-  {
-    supportsLogicOp = D3D::SupportsLogicOp(g_Config.iAdapter);
-    D3DCommon::UnloadLibraries();
-  }
+	g_Config.backend_info.APIType = API_D3D;
+	g_Config.backend_info.bSupportsExclusiveFullscreen = true;
+	g_Config.backend_info.bSupportsDualSourceBlend = true;
+	g_Config.backend_info.bSupportsPrimitiveRestart = true;
+	g_Config.backend_info.bSupportsOversizedViewports = false;
+	g_Config.backend_info.bSupportsGeometryShaders = true;
+	g_Config.backend_info.bSupports3DVision = true;
+	g_Config.backend_info.bSupportsPostProcessing = false;
+	g_Config.backend_info.bSupportsPaletteConversion = true;
+	g_Config.backend_info.bSupportsClipControl = true;
 
-  if (!supportsLogicOp)
-  {
-    result = _trans("Direct3D 11 renderer requires support for features not supported by your "
-                    "system configuration. This is most likely because you are using Windows 7. "
-                    "You may still use this backend, but you might encounter graphical artifacts."
-                    "\n\nDo you really want to switch to Direct3D 11? If unsure, select 'No'.");
-  }
+	IDXGIFactory* factory;
+	IDXGIAdapter* ad;
+	hr = DX11::PCreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
+	if (FAILED(hr))
+		PanicAlert("Failed to create IDXGIFactory object");
 
-  return result;
+	// adapters
+	g_Config.backend_info.Adapters.clear();
+	g_Config.backend_info.AAModes.clear();
+	while (factory->EnumAdapters((UINT)g_Config.backend_info.Adapters.size(), &ad) != DXGI_ERROR_NOT_FOUND)
+	{
+		const size_t adapter_index = g_Config.backend_info.Adapters.size();
+
+		DXGI_ADAPTER_DESC desc;
+		ad->GetDesc(&desc);
+
+		// TODO: These don't get updated on adapter change, yet
+		if (adapter_index == g_Config.iAdapter)
+		{
+			std::string samples;
+			std::vector<DXGI_SAMPLE_DESC> modes = DX11::D3D::EnumAAModes(ad);
+			// First iteration will be 1. This equals no AA.
+			for (unsigned int i = 0; i < modes.size(); ++i)
+			{
+				g_Config.backend_info.AAModes.push_back(modes[i].Count);
+			}
+
+			bool shader_model_5_supported = (DX11::D3D::GetFeatureLevel(ad) >= D3D_FEATURE_LEVEL_11_0);
+
+			// Requires the earlydepthstencil attribute (only available in shader model 5)
+			g_Config.backend_info.bSupportsEarlyZ = shader_model_5_supported;
+
+			// Requires full UAV functionality (only available in shader model 5)
+			g_Config.backend_info.bSupportsBBox = shader_model_5_supported;
+
+			// Requires the instance attribute (only available in shader model 5)
+			g_Config.backend_info.bSupportsGSInstancing = shader_model_5_supported;
+
+			// Sample shading requires shader model 5
+			g_Config.backend_info.bSupportsSSAA = shader_model_5_supported;
+		}
+		g_Config.backend_info.Adapters.push_back(UTF16ToUTF8(desc.Description));
+		ad->Release();
+	}
+	factory->Release();
+
+	// Clear ppshaders string vector
+	g_Config.backend_info.PPShaders.clear();
+	g_Config.backend_info.AnaglyphShaders.clear();
+
+	DX11::D3D::UnloadDXGI();
+	DX11::D3D::UnloadD3D();
 }
 
-void VideoBackend::InitBackendInfo()
+void VideoBackend::ShowConfig(void *hParent)
 {
-  if (!D3DCommon::LoadLibraries())
-    return;
-
-  FillBackendInfo();
-  D3DCommon::UnloadLibraries();
+	InitBackendInfo();
+	Host_ShowVideoConfig(hParent, GetDisplayName(), "gfx_dx11");
 }
 
-void VideoBackend::FillBackendInfo()
+bool VideoBackend::Initialize(void *window_handle)
 {
-  g_Config.backend_info.api_type = APIType::D3D;
-  g_Config.backend_info.MaxTextureSize = D3D11_REQ_TEXTURE2D_U_OR_V_DIMENSION;
-  g_Config.backend_info.bUsesLowerLeftOrigin = false;
-  g_Config.backend_info.bSupportsExclusiveFullscreen = true;
-  g_Config.backend_info.bSupportsDualSourceBlend = true;
-  g_Config.backend_info.bSupportsPrimitiveRestart = true;
-  g_Config.backend_info.bSupportsOversizedViewports = false;
-  g_Config.backend_info.bSupportsGeometryShaders = true;
-  g_Config.backend_info.bSupportsComputeShaders = false;
-  g_Config.backend_info.bSupports3DVision = true;
-  g_Config.backend_info.bSupportsPostProcessing = true;
-  g_Config.backend_info.bSupportsPaletteConversion = true;
-  g_Config.backend_info.bSupportsClipControl = true;
-  g_Config.backend_info.bSupportsDepthClamp = true;
-  g_Config.backend_info.bSupportsReversedDepthRange = false;
-  g_Config.backend_info.bSupportsMultithreading = false;
-  g_Config.backend_info.bSupportsGPUTextureDecoding = true;
-  g_Config.backend_info.bSupportsCopyToVram = true;
-  g_Config.backend_info.bSupportsLargePoints = false;
-  g_Config.backend_info.bSupportsDepthReadback = true;
-  g_Config.backend_info.bSupportsPartialDepthCopies = false;
-  g_Config.backend_info.bSupportsBitfield = false;
-  g_Config.backend_info.bSupportsDynamicSamplerIndexing = false;
-  g_Config.backend_info.bSupportsFramebufferFetch = false;
-  g_Config.backend_info.bSupportsBackgroundCompiling = true;
-  g_Config.backend_info.bSupportsST3CTextures = true;
-  g_Config.backend_info.bSupportsBPTCTextures = true;
-  g_Config.backend_info.bSupportsEarlyZ = true;
-  g_Config.backend_info.bSupportsBBox = true;
-  g_Config.backend_info.bSupportsFragmentStoresAndAtomics = true;
-  g_Config.backend_info.bSupportsGSInstancing = true;
-  g_Config.backend_info.bSupportsSSAA = true;
-  g_Config.backend_info.bSupportsShaderBinaries = true;
-  g_Config.backend_info.bSupportsPipelineCacheData = false;
-  g_Config.backend_info.bSupportsLogicOp = D3D::SupportsLogicOp(g_Config.iAdapter);
+	if (window_handle == nullptr)
+		return false;
 
-  g_Config.backend_info.Adapters = D3DCommon::GetAdapterNames();
-  g_Config.backend_info.AAModes = D3D::GetAAModes(g_Config.iAdapter);
+	InitializeShared();
+	InitBackendInfo();
 
-  // Override optional features if we are actually booting.
-  if (D3D::device)
-  {
-    g_Config.backend_info.bSupportsST3CTextures =
-        D3D::SupportsTextureFormat(DXGI_FORMAT_BC1_UNORM) &&
-        D3D::SupportsTextureFormat(DXGI_FORMAT_BC2_UNORM) &&
-        D3D::SupportsTextureFormat(DXGI_FORMAT_BC3_UNORM);
-    g_Config.backend_info.bSupportsBPTCTextures = D3D::SupportsTextureFormat(DXGI_FORMAT_BC7_UNORM);
+	frameCount = 0;
 
-    // Features only supported with a FL11.0+ device.
-    const bool shader_model_5_supported = D3D::feature_level >= D3D_FEATURE_LEVEL_11_0;
-    g_Config.backend_info.bSupportsEarlyZ = shader_model_5_supported;
-    g_Config.backend_info.bSupportsBBox = shader_model_5_supported;
-    g_Config.backend_info.bSupportsFragmentStoresAndAtomics = shader_model_5_supported;
-    g_Config.backend_info.bSupportsGSInstancing = shader_model_5_supported;
-    g_Config.backend_info.bSupportsSSAA = shader_model_5_supported;
-    g_Config.backend_info.bSupportsGPUTextureDecoding = shader_model_5_supported;
-  }
+	if (File::Exists(File::GetUserPath(D_CONFIG_IDX) + "GFX.ini"))
+		g_Config.Load(File::GetUserPath(D_CONFIG_IDX) + "GFX.ini");
+	else
+		g_Config.Load(File::GetUserPath(D_CONFIG_IDX) + "gfx_dx11.ini");
+
+	g_Config.GameIniLoad();
+	g_Config.UpdateProjectionHack();
+	g_Config.VerifyValidity();
+	UpdateActiveConfig();
+
+	m_window_handle = window_handle;
+	m_initialized = true;
+
+	return true;
 }
 
-bool VideoBackend::Initialize(const WindowSystemInfo& wsi)
+void VideoBackend::Video_Prepare()
 {
-  if (!g_renderer)
-  {
-    if (!D3D::Create(g_Config.iAdapter, g_Config.bEnableValidationLayer))
-      return false;
+	// internal interfaces
+	g_renderer = std::make_unique<Renderer>(m_window_handle);
+	g_texture_cache = std::make_unique<TextureCache>();
+	g_vertex_manager = std::make_unique<VertexManager>();
+	g_perf_query = std::make_unique<PerfQuery>();
+	VertexShaderCache::Init();
+	PixelShaderCache::Init();
+	GeometryShaderCache::Init();
+	D3D::InitUtils();
 
-    s_create_device = true;
-    FillBackendInfo();
-    InitializeShared();
+	// VideoCommon
+	BPInit();
+	Fifo::Init();
+	IndexGenerator::Init();
+	VertexLoaderManager::Init();
+	OpcodeDecoder::Init();
+	VertexShaderManager::Init();
+	PixelShaderManager::Init();
+	GeometryShaderManager::Init();
+	CommandProcessor::Init();
+	PixelEngine::Init();
+	BBox::Init();
 
-    std::unique_ptr<SwapChain> swap_chain;
-    if (wsi.render_surface && !(swap_chain = SwapChain::Create(wsi)))
-    {
-      PanicAlertT("Failed to create D3D swap chain");
-      ShutdownShared();
-      D3D::Destroy();
-      return false;
-    }
-
-    g_renderer = std::make_unique<Renderer>(std::move(swap_chain), wsi.render_surface_scale);
-  }
-
-  g_vertex_manager = std::make_unique<VertexManager>();
-  g_shader_cache = std::make_unique<VideoCommon::ShaderCache>();
-  g_framebuffer_manager = std::make_unique<FramebufferManager>();
-  g_texture_cache = std::make_unique<TextureCacheBase>();
-  g_perf_query = std::make_unique<PerfQuery>();
-  if (!g_vertex_manager->Initialize() || !g_shader_cache->Initialize() ||
-      !g_renderer->Initialize() || !g_framebuffer_manager->Initialize() ||
-      !g_texture_cache->Initialize())
-  {
-    Shutdown();
-    return false;
-  }
-
-  BBox::Init();
-  g_shader_cache->InitializeShaderCache();
-  return true;
+	// Tell the host that the window is ready
+	Host_Message(WM_USER_CREATE);
 }
 
 void VideoBackend::Shutdown()
 {
-  g_shader_cache->Shutdown();
-  g_renderer->Shutdown();
+	m_initialized = false;
 
-  BBox::Shutdown();
+	// TODO: should be in Video_Cleanup
+	if (g_renderer)
+	{
+		// VideoCommon
+		Fifo::Shutdown();
+		CommandProcessor::Shutdown();
+		GeometryShaderManager::Shutdown();
+		PixelShaderManager::Shutdown();
+		VertexShaderManager::Shutdown();
+		OpcodeDecoder::Shutdown();
+		VertexLoaderManager::Shutdown();
 
-  g_perf_query.reset();
-  g_texture_cache.reset();
-  g_framebuffer_manager.reset();
-  g_shader_cache.reset();
-  g_vertex_manager.reset();
-  g_renderer.reset();
+		// internal interfaces
+		D3D::ShutdownUtils();
+		PixelShaderCache::Shutdown();
+		VertexShaderCache::Shutdown();
+		GeometryShaderCache::Shutdown();
+		BBox::Shutdown();
 
-  ShutdownShared();
-  if (s_create_device)
-    D3D::Destroy();
+		g_perf_query.reset();
+		g_vertex_manager.reset();
+		g_texture_cache.reset();
+		g_renderer.reset();
+	}
 }
-}  // namespace DX11
+
+void VideoBackend::Video_Cleanup()
+{
+}
+
+}

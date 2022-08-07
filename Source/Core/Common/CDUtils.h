@@ -7,11 +7,8 @@
 #include <string>
 #include <vector>
 
-namespace Common
-{
 // Returns a pointer to an array of strings with the device names
-std::vector<std::string> GetCDDevices();
+std::vector<std::string> cdio_get_devices();
 
 // Returns true if device is cdrom/dvd
-bool IsCDROMDevice(std::string device);
-}  // namespace Common
+bool cdio_is_cdrom(std::string device);

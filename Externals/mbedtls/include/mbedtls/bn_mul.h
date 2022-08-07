@@ -1,9 +1,8 @@
 /**
  * \file bn_mul.h
  *
- * \brief Multi-precision integer library
- */
-/*
+ * \brief  Multi-precision integer library
+ *
  *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
  *  SPDX-License-Identifier: Apache-2.0
  *
@@ -38,12 +37,6 @@
 #ifndef MBEDTLS_BN_MUL_H
 #define MBEDTLS_BN_MUL_H
 
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
-
 #include "bignum.h"
 
 #if defined(MBEDTLS_HAVE_ASM)
@@ -55,14 +48,7 @@
 /* armcc5 --gnu defines __GNUC__ but doesn't support GNU's extended asm */
 #if defined(__GNUC__) && \
     ( !defined(__ARMCC_VERSION) || __ARMCC_VERSION >= 6000000 )
-
-/*
- * Disable use of the i386 assembly code below if option -O0, to disable all
- * compiler optimisations, is passed, detected with __OPTIMIZE__
- * This is done as the number of registers used in the assembly code doesn't
- * work with the -O0 option.
- */
-#if defined(__i386__) && defined(__OPTIMIZE__)
+#if defined(__i386__)
 
 #define MULADDC_INIT                        \
     asm(                                    \
@@ -155,7 +141,7 @@
         "movl   %%esi, %3       \n\t"   \
         : "=m" (t), "=m" (c), "=m" (d), "=m" (s)        \
         : "m" (t), "m" (s), "m" (d), "m" (c), "m" (b)   \
-        : "eax", "ebx", "ecx", "edx", "esi", "edi"      \
+        : "eax", "ecx", "edx", "esi", "edi"             \
     );
 
 #else
@@ -167,7 +153,7 @@
         "movl   %%esi, %3       \n\t"   \
         : "=m" (t), "=m" (c), "=m" (d), "=m" (s)        \
         : "m" (t), "m" (s), "m" (d), "m" (c), "m" (b)   \
-        : "eax", "ebx", "ecx", "edx", "esi", "edi"      \
+        : "eax", "ecx", "edx", "esi", "edi"             \
     );
 #endif /* SSE2 */
 #endif /* i386 */
@@ -176,24 +162,31 @@
 
 #define MULADDC_INIT                        \
     asm(                                    \
-        "xorq   %%r8, %%r8\n"
+        "movq   %3, %%rsi           \n\t"   \
+        "movq   %4, %%rdi           \n\t"   \
+        "movq   %5, %%rcx           \n\t"   \
+        "movq   %6, %%rbx           \n\t"   \
+        "xorq   %%r8, %%r8          \n\t"
 
 #define MULADDC_CORE                        \
-        "movq   (%%rsi), %%rax\n"           \
-        "mulq   %%rbx\n"                    \
-        "addq   $8, %%rsi\n"                \
-        "addq   %%rcx, %%rax\n"             \
-        "movq   %%r8, %%rcx\n"              \
-        "adcq   $0, %%rdx\n"                \
-        "nop    \n"                         \
-        "addq   %%rax, (%%rdi)\n"           \
-        "adcq   %%rdx, %%rcx\n"             \
-        "addq   $8, %%rdi\n"
+        "movq   (%%rsi), %%rax      \n\t"   \
+        "mulq   %%rbx               \n\t"   \
+        "addq   $8,      %%rsi      \n\t"   \
+        "addq   %%rcx,   %%rax      \n\t"   \
+        "movq   %%r8,    %%rcx      \n\t"   \
+        "adcq   $0,      %%rdx      \n\t"   \
+        "nop                        \n\t"   \
+        "addq   %%rax,   (%%rdi)    \n\t"   \
+        "adcq   %%rdx,   %%rcx      \n\t"   \
+        "addq   $8,      %%rdi      \n\t"
 
 #define MULADDC_STOP                        \
-        : "+c" (c), "+D" (d), "+S" (s)      \
-        : "b" (b)                           \
-        : "rax", "rdx", "r8"                \
+        "movq   %%rcx, %0           \n\t"   \
+        "movq   %%rdi, %1           \n\t"   \
+        "movq   %%rsi, %2           \n\t"   \
+        : "=m" (c), "=m" (d), "=m" (s)                      \
+        : "m" (s), "m" (d), "m" (c), "m" (b)                \
+        : "rax", "rcx", "rdx", "rbx", "rsi", "rdi", "r8"    \
     );
 
 #endif /* AMD64 */
@@ -419,11 +412,10 @@
 #endif /* PPC32 */
 
 /*
- * The Sparc(64) assembly is reported to be broken.
+ * The Sparc64 assembly is reported to be broken.
  * Disable it for now, until we're able to fix it.
  */
-#if 0 && defined(__sparc__)
-#if defined(__sparc64__)
+#if 0 && defined(__sparc__) && defined(__sparc64__)
 
 #define MULADDC_INIT                                    \
     asm(                                                \
@@ -454,8 +446,9 @@
         : "g1", "o0", "o1", "o2", "o3", "o4",   \
           "o5"                                  \
         );
+#endif /* SPARCv9 */
 
-#else /* __sparc64__ */
+#if defined(__sparc__) && !defined(__sparc64__)
 
 #define MULADDC_INIT                                    \
     asm(                                                \
@@ -487,8 +480,7 @@
           "o5"                                  \
         );
 
-#endif /* __sparc64__ */
-#endif /* __sparc__ */
+#endif /* SPARCv8 */
 
 #if defined(__microblaze__) || defined(microblaze)
 
@@ -534,7 +526,7 @@
         "swi   r3,   %2         \n\t"   \
         : "=m" (c), "=m" (d), "=m" (s)              \
         : "m" (s), "m" (d), "m" (c), "m" (b)        \
-        : "r3", "r4", "r5", "r6", "r7", "r8",       \
+        : "r3", "r4"  "r5", "r6", "r7", "r8",       \
           "r9", "r10", "r11", "r12", "r13"          \
     );
 
@@ -570,22 +562,7 @@
 
 #endif /* TriCore */
 
-/*
- * Note, gcc -O0 by default uses r7 for the frame pointer, so it complains about
- * our use of r7 below, unless -fomit-frame-pointer is passed.
- *
- * On the other hand, -fomit-frame-pointer is implied by any -Ox options with
- * x !=0, which we can detect using __OPTIMIZE__ (which is also defined by
- * clang and armcc5 under the same conditions).
- *
- * So, only use the optimized assembly below for optimized build, which avoids
- * the build error and is pretty reasonable anyway.
- */
-#if defined(__GNUC__) && !defined(__OPTIMIZE__)
-#define MULADDC_CANNOT_USE_R7
-#endif
-
-#if defined(__arm__) && !defined(MULADDC_CANNOT_USE_R7)
+#if defined(__arm__)
 
 #if defined(__thumb__) && !defined(__thumb2__)
 
@@ -640,23 +617,6 @@
          : "m" (s), "m" (d), "m" (c), "m" (b)   \
          : "r0", "r1", "r2", "r3", "r4", "r5",  \
            "r6", "r7", "r8", "r9", "cc"         \
-         );
-
-#elif defined (__ARM_FEATURE_DSP) && (__ARM_FEATURE_DSP == 1)
-
-#define MULADDC_INIT                            \
-    asm(
-
-#define MULADDC_CORE                            \
-            "ldr    r0, [%0], #4        \n\t"   \
-            "ldr    r1, [%1]            \n\t"   \
-            "umaal  r1, %2, %3, r0      \n\t"   \
-            "str    r1, [%1], #4        \n\t"
-
-#define MULADDC_STOP                            \
-         : "=r" (s),  "=r" (d), "=r" (c)        \
-         : "r" (b), "0" (s), "1" (d), "2" (c)   \
-         : "r0", "r1", "memory"                 \
          );
 
 #else
@@ -756,7 +716,7 @@
         "sw     $10, %2         \n\t"   \
         : "=m" (c), "=m" (d), "=m" (s)                      \
         : "m" (s), "m" (d), "m" (c), "m" (b)                \
-        : "$9", "$10", "$11", "$12", "$13", "$14", "$15", "lo", "hi" \
+        : "$9", "$10", "$11", "$12", "$13", "$14", "$15"    \
     );
 
 #endif /* MIPS */

@@ -1,4 +1,4 @@
-// Copyright 2019 Dolphin Emulator Project
+// Copyright 2011 Dolphin Emulator Project
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
@@ -9,17 +9,25 @@
 
 namespace DX12
 {
-class VideoBackend final : public VideoBackendBase
-{
-public:
-  bool Initialize(const WindowSystemInfo& wsi) override;
-  void Shutdown() override;
 
-  std::string GetName() const override;
-  std::string GetDisplayName() const override;
-  void InitBackendInfo() override;
+class VideoBackend : public VideoBackendBase
+{
+	bool Initialize(void*) override;
+	void Shutdown() override;
+
+	std::string GetName() const override;
+	std::string GetDisplayName() const override;
+
+	void Video_Prepare() override;
+	void Video_Cleanup() override;
+
+	void ShowConfig(void* parent) override;
+
+	unsigned int PeekMessages() override;
 
 private:
-  void FillBackendInfo();
+	void* m_window_handle;
 };
-}  // namespace DX12
+
+}
+

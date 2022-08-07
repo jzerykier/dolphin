@@ -4,21 +4,15 @@
 
 #pragma once
 
-#include "Common/CommonTypes.h"
 #include "Core/HW/DSPHLE/UCodes/UCodes.h"
-
-namespace DSP::HLE
-{
-class DSPHLE;
 
 class CARDUCode : public UCodeInterface
 {
 public:
-  CARDUCode(DSPHLE* dsphle, u32 crc);
-  ~CARDUCode() override;
+	CARDUCode(DSPHLE *dsphle, u32 crc);
+	virtual ~CARDUCode();
 
-  void Initialize() override;
-  void HandleMail(u32 mail) override;
-  void Update() override;
+	void HandleMail(u32 mail) override;
+	void Update() override;
 };
-}  // namespace DSP::HLE
+

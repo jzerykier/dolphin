@@ -1,93 +1,102 @@
 package org.dolphinemu.dolphinemu.ui.platform;
 
+import android.app.Fragment;
+import android.database.Cursor;
 import android.os.Bundle;
-
-import androidx.annotation.Nullable;
-import androidx.fragment.app.Fragment;
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
+import android.support.annotation.Nullable;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import org.dolphinemu.dolphinemu.BuildConfig;
 import org.dolphinemu.dolphinemu.R;
 import org.dolphinemu.dolphinemu.adapters.GameAdapter;
-import org.dolphinemu.dolphinemu.services.GameFileCacheService;
 
 public final class PlatformGamesFragment extends Fragment implements PlatformGamesView
 {
-  private static final String ARG_PLATFORM = "platform";
+	private static final String ARG_PLATFORM = BuildConfig.APPLICATION_ID + ".PLATFORM";
 
-  private GameAdapter mAdapter;
-  private RecyclerView mRecyclerView;
+	private PlatformGamesPresenter mPresenter = new PlatformGamesPresenter(this);
 
-  public static PlatformGamesFragment newInstance(Platform platform)
-  {
-    PlatformGamesFragment fragment = new PlatformGamesFragment();
+	private GameAdapter mAdapter;
+	private RecyclerView mRecyclerView;
 
-    Bundle args = new Bundle();
-    args.putSerializable(ARG_PLATFORM, platform);
+	public static PlatformGamesFragment newInstance(int platform)
+	{
+		PlatformGamesFragment fragment = new PlatformGamesFragment();
 
-    fragment.setArguments(args);
-    return fragment;
-  }
+		Bundle args = new Bundle();
+		args.putInt(ARG_PLATFORM, platform);
 
-  @Override
-  public void onCreate(Bundle savedInstanceState)
-  {
-    super.onCreate(savedInstanceState);
-  }
+		fragment.setArguments(args);
+		return fragment;
+	}
 
-  @Override
-  public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
-  {
-    View rootView = inflater.inflate(R.layout.fragment_grid, container, false);
+	@Override
+	public void onCreate(Bundle savedInstanceState)
+	{
+		super.onCreate(savedInstanceState);
 
-    findViews(rootView);
+		mPresenter.onCreate(getArguments().getInt(ARG_PLATFORM));
+	}
 
-    return rootView;
-  }
+	@Nullable
+	@Override
+	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState)
+	{
+		View rootView = inflater.inflate(R.layout.fragment_grid, container, false);
 
-  @Override
-  public void onViewCreated(View view, Bundle savedInstanceState)
-  {
-    int columns = getResources().getInteger(R.integer.game_grid_columns);
-    RecyclerView.LayoutManager layoutManager = new GridLayoutManager(getActivity(), columns);
-    mAdapter = new GameAdapter();
+		findViews(rootView);
 
-    mRecyclerView.setLayoutManager(layoutManager);
-    mRecyclerView.setAdapter(mAdapter);
+		mPresenter.onCreateView();
 
-    mRecyclerView.addItemDecoration(new GameAdapter.SpacesItemDecoration(8));
+		return rootView;
+	}
 
-    showGames();
-  }
+	@Override
+	public void onViewCreated(View view, Bundle savedInstanceState)
+	{
+		int columns = getResources().getInteger(R.integer.game_grid_columns);
+		RecyclerView.LayoutManager layoutManager = new GridLayoutManager(getActivity(), columns);
+		mAdapter = new GameAdapter();
 
-  @Override
-  public void refreshScreenshotAtPosition(int position)
-  {
-    mAdapter.notifyItemChanged(position);
-  }
+		mRecyclerView.setLayoutManager(layoutManager);
+		mRecyclerView.setAdapter(mAdapter);
 
-  @Override
-  public void onItemClick(String gameId)
-  {
-    // No-op for now
-  }
+		mRecyclerView.addItemDecoration(new GameAdapter.SpacesItemDecoration(8));
+	}
 
-  @Override
-  public void showGames()
-  {
-    if (mAdapter != null)
-    {
-      Platform platform = (Platform) getArguments().getSerializable(ARG_PLATFORM);
-      mAdapter.swapDataSet(GameFileCacheService.getGameFilesForPlatform(platform));
-    }
-  }
+	@Override
+	public void refreshScreenshotAtPosition(int position)
+	{
+		mAdapter.notifyItemChanged(position);
+	}
 
-  private void findViews(View root)
-  {
-    mRecyclerView = (RecyclerView) root.findViewById(R.id.grid_games);
-  }
+	@Override
+	public void refresh()
+	{
+		mPresenter.refresh();
+	}
+
+	@Override
+	public void onItemClick(String gameId)
+	{
+		// No-op for now
+	}
+
+	@Override
+	public void showGames(Cursor games)
+	{
+		if (mAdapter != null)
+		{
+			mAdapter.swapCursor(games);
+		}
+	}
+
+	private void findViews(View root)
+	{
+		mRecyclerView = (RecyclerView) root.findViewById(R.id.grid_games);
+	}
 }

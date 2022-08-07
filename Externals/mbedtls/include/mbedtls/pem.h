@@ -2,8 +2,7 @@
  * \file pem.h
  *
  * \brief Privacy Enhanced Mail (PEM) decoding
- */
-/*
+ *
  *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
  *  SPDX-License-Identifier: Apache-2.0
  *
@@ -23,12 +22,6 @@
  */
 #ifndef MBEDTLS_PEM_H
 #define MBEDTLS_PEM_H
-
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
 
 #include <stddef.h>
 
@@ -57,7 +50,7 @@ extern "C" {
 /**
  * \brief       PEM context structure
  */
-typedef struct mbedtls_pem_context
+typedef struct
 {
     unsigned char *buf;     /*!< buffer for decoded data             */
     size_t buflen;          /*!< length of the buffer                */

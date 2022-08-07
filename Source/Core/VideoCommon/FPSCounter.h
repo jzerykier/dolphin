@@ -6,25 +6,27 @@
 
 #include <fstream>
 
-#include "Common/CommonTypes.h"
+#include "Common/Timer.h"
 
 class FPSCounter
 {
 public:
-  // Initializes the FPS counter.
-  FPSCounter();
+	// Initializes the FPS counter.
+	FPSCounter();
 
-  // Called when a frame is rendered (updated every second).
-  void Update();
+	// Called when a frame is rendered (updated every second).
+	void Update();
 
-  float GetFPS() const { return m_fps; }
+	unsigned int GetFPS() const { return m_fps; }
 
 private:
-  u64 m_last_time = 0;
-  u64 m_time_since_update = 0;
-  u32 m_frame_counter = 0;
-  float m_fps = 0;
-  std::ofstream m_bench_file;
+	unsigned int m_fps = 0;
+	unsigned int m_counter = 0;
+	unsigned int m_fps_last_counter = 0;
+	Common::Timer m_update_time;
 
-  void LogRenderTimeToFile(u64 val);
+	Common::Timer m_render_time;
+	std::ofstream m_bench_file;
+
+	void LogRenderTimeToFile(u64 val);
 };

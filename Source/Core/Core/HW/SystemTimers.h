@@ -8,6 +8,7 @@
 
 namespace SystemTimers
 {
+
 /*
 GameCube                   MHz
 flipper <-> ARAM bus:      81 (DSP)
@@ -30,20 +31,13 @@ broadway:                       729
 
 enum
 {
-  TIMER_RATIO = 12
-};
-
-enum class Mode
-{
-  GC,
-  Wii,
+	TIMER_RATIO = 12
 };
 
 u32 GetTicksPerSecond();
 void PreInit();
 void Init();
 void Shutdown();
-void ChangePPCClock(Mode mode);
 
 // Notify timing system that somebody wrote to the decrementer
 void DecrementerSet();
@@ -51,15 +45,5 @@ u32 GetFakeDecrementer();
 
 void TimeBaseSet();
 u64 GetFakeTimeBase();
-// Custom RTC
-s64 GetLocalTimeRTCOffset();
 
-// Returns an estimate of how fast/slow the emulation is running (excluding throttling induced sleep
-// time). The estimate is computed over the last 1s of emulated time. Example values:
-//
-// - 0.5: the emulator is running at 50% speed (falling behind).
-// - 1.0: the emulator is running at 100% speed.
-// - 2.0: the emulator is running at 200% speed (or 100% speed but sleeping half of the time).
-double GetEstimatedEmulationPerformance();
-
-}  // namespace SystemTimers
+}

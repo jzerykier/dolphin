@@ -4,37 +4,24 @@
 
 #pragma once
 
-#if defined(__APPLE__) && defined(__OBJC__)
+#ifdef __APPLE__
 #import <AppKit/AppKit.h>
-#else
-struct NSOpenGLContext;
-struct NSOpenGLPixelFormat;
-struct NSView;
 #endif
 
-#include "Common/GL/GLContext.h"
+#include "Common/GL/GLInterfaceBase.h"
 
-class GLContextAGL final : public GLContext
+class cInterfaceAGL : public cInterfaceBase
 {
+private:
+	NSView* cocoaWin;
+	NSOpenGLContext* cocoaCtx;
 public:
-  ~GLContextAGL() override;
+	void Swap() override;
+	bool Create(void* window_handle, bool core) override;
+	bool MakeCurrent() override;
+	bool ClearCurrent() override;
+	void Shutdown() override;
+	void Update() override;
+	void SwapInterval(int interval) override;
 
-  bool IsHeadless() const override;
-
-  std::unique_ptr<GLContext> CreateSharedContext() override;
-
-  bool MakeCurrent() override;
-  bool ClearCurrent() override;
-
-  void Update() override;
-
-  void Swap() override;
-  void SwapInterval(int interval) override;
-
-protected:
-  bool Initialize(const WindowSystemInfo& wsi, bool stereo, bool core) override;
-
-  NSView* m_view = nullptr;
-  NSOpenGLContext* m_context = nullptr;
-  NSOpenGLPixelFormat* m_pixel_format = nullptr;
 };

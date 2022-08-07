@@ -18,6 +18,8 @@ if(APPLE)
 	add_definitions(-DMACOSX -D_DARWIN_C_SOURCE)
 endif()
 
+include_directories(include)
+
 set(SRCS	src/igd_desc_parse.c
 			src/miniupnpc.c
 			src/minixml.c
@@ -33,6 +35,4 @@ set(SRCS	src/igd_desc_parse.c
 			src/receivedata.c)
 
 add_library(miniupnpc STATIC ${SRCS})
-target_include_directories(miniupnpc PUBLIC src)
 
-add_library(Miniupnpc::miniupnpc ALIAS miniupnpc)

@@ -8,22 +8,22 @@
 // Generic, do nothing
 namespace FPURoundMode
 {
-void SetRoundMode(int mode)
-{
+	void SetRoundMode(int mode)
+	{
+	}
+	void SetPrecisionMode(PrecisionMode mode)
+	{
+	}
+	void SetSIMDMode(int rounding_mode, bool non_ieee_mode)
+	{
+	}
+	void SaveSIMDState()
+	{
+	}
+	void LoadSIMDState()
+	{
+	}
+	void LoadDefaultSIMDState()
+	{
+	}
 }
-void SetPrecisionMode(PrecisionMode mode)
-{
-}
-void SetSIMDMode(int rounding_mode, bool non_ieee_mode)
-{
-}
-void SaveSIMDState()
-{
-}
-void LoadSIMDState()
-{
-}
-void LoadDefaultSIMDState()
-{
-}
-}  // namespace FPURoundMode

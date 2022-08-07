@@ -4,10 +4,15 @@
 
 #pragma once
 
+#include <vector>
 #include <Windows.h>
-#include <unordered_set>
 
-namespace ciface::DInput
+namespace ciface
 {
-std::unordered_set<DWORD> GetXInputGUIDS();
-}  // namespace ciface::DInput
+namespace DInput
+{
+
+void GetXInputGUIDS(std::vector<DWORD>* guids);
+
+}
+}

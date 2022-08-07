@@ -28,7 +28,6 @@
 #if defined(MBEDTLS_ASN1_PARSE_C)
 
 #include "mbedtls/asn1.h"
-#include "mbedtls/platform_util.h"
 
 #include <string.h>
 
@@ -43,6 +42,11 @@
 #define mbedtls_calloc    calloc
 #define mbedtls_free       free
 #endif
+
+/* Implementation that should never be optimized out by the compiler */
+static void mbedtls_zeroize( void *v, size_t n ) {
+    volatile unsigned char *p = v; while( n-- ) *p++ = 0;
+}
 
 /*
  * ASN.1 DER decoding routines
@@ -149,7 +153,7 @@ int mbedtls_asn1_get_int( unsigned char **p,
     if( ( ret = mbedtls_asn1_get_tag( p, end, &len, MBEDTLS_ASN1_INTEGER ) ) != 0 )
         return( ret );
 
-    if( len == 0 || len > sizeof( int ) || ( **p & 0x80 ) != 0 )
+    if( len > sizeof( int ) || ( **p & 0x80 ) != 0 )
         return( MBEDTLS_ERR_ASN1_INVALID_LENGTH );
 
     *val = 0;
@@ -265,8 +269,7 @@ int mbedtls_asn1_get_sequence_of( unsigned char **p,
         /* Allocate and assign next pointer */
         if( *p < end )
         {
-            cur->next = (mbedtls_asn1_sequence*)mbedtls_calloc( 1,
-                                            sizeof( mbedtls_asn1_sequence ) );
+            cur->next = mbedtls_calloc( 1, sizeof( mbedtls_asn1_sequence ) );
 
             if( cur->next == NULL )
                 return( MBEDTLS_ERR_ASN1_ALLOC_FAILED );
@@ -309,7 +312,7 @@ int mbedtls_asn1_get_alg( unsigned char **p,
 
     if( *p == end )
     {
-        mbedtls_platform_zeroize( params, sizeof(mbedtls_asn1_buf) );
+        mbedtls_zeroize( params, sizeof(mbedtls_asn1_buf) );
         return( 0 );
     }
 
@@ -354,7 +357,7 @@ void mbedtls_asn1_free_named_data( mbedtls_asn1_named_data *cur )
     mbedtls_free( cur->oid.p );
     mbedtls_free( cur->val.p );
 
-    mbedtls_platform_zeroize( cur, sizeof( mbedtls_asn1_named_data ) );
+    mbedtls_zeroize( cur, sizeof( mbedtls_asn1_named_data ) );
 }
 
 void mbedtls_asn1_free_named_data_list( mbedtls_asn1_named_data **head )

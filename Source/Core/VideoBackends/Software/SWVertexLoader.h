@@ -5,29 +5,43 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "Common/CommonTypes.h"
 
 #include "VideoBackends/Software/NativeVertexFormat.h"
-#include "VideoBackends/Software/SetupUnit.h"
 
+#include "VideoCommon/VertexLoaderBase.h"
 #include "VideoCommon/VertexManagerBase.h"
 
-class SWVertexLoader final : public VertexManagerBase
+class SetupUnit;
+
+class SWVertexLoader : public VertexManagerBase
 {
 public:
-  SWVertexLoader();
-  ~SWVertexLoader();
+	SWVertexLoader();
+	~SWVertexLoader();
+
+	NativeVertexFormat* CreateNativeVertexFormat(const PortableVertexDeclaration& vdec) override;
 
 protected:
-  void DrawCurrentBatch(u32 base_index, u32 num_indices, u32 base_vertex) override;
+	void ResetBuffer(u32 stride) override;
+	u16* GetIndexBuffer() { return &LocalIBuffer[0]; }
+private:
+	void vFlush(bool useDstAlpha) override;
+	std::vector<u8> LocalVBuffer;
+	std::vector<u16> LocalIBuffer;
 
-  void SetFormat(u8 attributeIndex, u8 primitiveType);
-  void ParseVertex(const PortableVertexDeclaration& vdec, int index);
+	InputVertexData m_Vertex;
 
-  InputVertexData m_vertex;
-  SetupUnit m_setup_unit;
+	void ParseVertex(const PortableVertexDeclaration& vdec, int index);
 
-  bool m_tex_gen_special_case;
+	SetupUnit *m_SetupUnit;
+
+	bool m_TexGenSpecialCase;
+
+public:
+
+	void SetFormat(u8 attributeIndex, u8 primitiveType);
 };

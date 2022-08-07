@@ -24,3 +24,4 @@
 #include "Common/GL/GLExtensions/gl_common.h"
 
 #define GL_EXTERNAL_VIRTUAL_MEMORY_BUFFER_AMD 0x9160
+

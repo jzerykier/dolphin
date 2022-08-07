@@ -5,7 +5,7 @@
               android:layout_height="match_parent"
               android:orientation="vertical">
 
-    <androidx.appcompat.widget.Toolbar
+    <Toolbar
         android:id="@+id/toolbar_folder_list"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -14,7 +14,8 @@
         android:theme="@android:style/ThemeOverlay.Material.Dark.ActionBar"
         android:elevation="6dp"/>
 
-    <androidx.recyclerview.widget.RecyclerView
+
+    <android.support.v7.widget.RecyclerView
         android:id="@+id/list_files"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -23,5 +24,6 @@
         tools:listitem="@layout/list_item_file"
         android:elevation="4dp"
         android:background="@android:color/white"/>
+
 
 </LinearLayout>

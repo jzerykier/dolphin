@@ -4,11 +4,17 @@
 
 #pragma once
 
-namespace ciface::OSX
+#include "InputCommon/ControllerInterface/Device.h"
+
+namespace ciface
 {
-void Init(void* window);
-void PopulateDevices(void* window);
+namespace OSX
+{
+
+void Init(std::vector<Core::Device*>& devices, void *window);
 void DeInit();
 
-void DeviceElementDebugPrint(const void*, void*);
-}  // namespace ciface::OSX
+void DeviceElementDebugPrint(const void *, void *);
+
+}
+}

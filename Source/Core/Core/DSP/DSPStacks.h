@@ -7,10 +7,5 @@
 
 #include "Common/CommonTypes.h"
 
-namespace DSP
-{
-enum class StackRegister;
-
-void dsp_reg_store_stack(StackRegister stack_reg, u16 val);
-u16 dsp_reg_load_stack(StackRegister stack_reg);
-}  // namespace DSP
+void dsp_reg_store_stack(int stack_reg, u16 val);
+u16 dsp_reg_load_stack(int stack_reg);

@@ -4,31 +4,39 @@
 
 #pragma once
 
-#include <array>
-
 #include "Common/CommonTypes.h"
+
+#include "VideoCommon/BPMemory.h"
 #include "VideoCommon/CPMemory.h"
 
 namespace FifoAnalyzer
 {
-enum class DecodeMode
-{
-  Record,
-  Playback,
-};
+	void Init();
 
-u32 AnalyzeCommand(const u8* data, DecodeMode mode);
+	u8 ReadFifo8(u8*& data);
+	u16 ReadFifo16(u8*& data);
+	u32 ReadFifo32(u8*& data);
 
-struct CPMemory
-{
-  TVtxDesc vtxDesc;
-  std::array<VAT, 8> vtxAttr;
-  std::array<u32, 16> arrayBases;
-  std::array<u32, 16> arrayStrides;
-};
+	enum DecodeMode
+	{
+		DECODE_RECORD,
+		DECODE_PLAYBACK,
+	};
 
-void LoadCPReg(u32 subCmd, u32 value, CPMemory& cpMem);
+	u32 AnalyzeCommand(u8* data, DecodeMode mode);
 
-extern bool s_DrawingObject;
-extern FifoAnalyzer::CPMemory s_CpMem;
-}  // namespace FifoAnalyzer
+	struct CPMemory
+	{
+		TVtxDesc vtxDesc;
+		VAT vtxAttr[8];
+		u32 arrayBases[16];
+		u32 arrayStrides[16];
+	};
+
+	void LoadCPReg(u32 subCmd, u32 value, CPMemory& cpMem);
+
+	void CalculateVertexElementSizes(int sizes[], int vatIndex, const CPMemory& cpMem);
+
+	extern bool s_DrawingObject;
+	extern FifoAnalyzer::CPMemory s_CpMem;
+}

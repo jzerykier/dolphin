@@ -6,13 +6,15 @@
 
 namespace OGL
 {
+
 class BoundingBox
 {
 public:
-  static void Init();
-  static void Shutdown();
+	static void Init();
+	static void Shutdown();
 
-  static void Set(int index, int value);
-  static int Get(int index);
+	static void Set(int index, int value);
+	static int Get(int index);
 };
-};  // namespace OGL
+
+};

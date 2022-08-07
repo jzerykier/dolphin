@@ -1,184 +1,152 @@
-// Copyright 2019 Dolphin Emulator Project
+// Copyright 2014 Dolphin Emulator Project
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include <memory>
+
+#include "Common/CommonTypes.h"
+#include "Common/MsgHandler.h"
 #include "VideoBackends/D3D12/BoundingBox.h"
-#include "Common/Logging/Log.h"
-#include "VideoBackends/D3D12/DXContext.h"
-#include "VideoBackends/D3D12/Renderer.h"
-#include <cstring>
+#include "VideoBackends/D3D12/D3DBase.h"
+#include "VideoBackends/D3D12/D3DCommandListManager.h"
+#include "VideoBackends/D3D12/D3DDescriptorHeapManager.h"
+#include "VideoBackends/D3D12/D3DStreamBuffer.h"
+#include "VideoBackends/D3D12/D3DUtil.h"
+#include "VideoBackends/D3D12/FramebufferManager.h"
+#include "VideoBackends/D3D12/Render.h"
+#include "VideoCommon/VideoConfig.h"
 
 namespace DX12
 {
-BoundingBox::BoundingBox() = default;
 
-BoundingBox::~BoundingBox()
+constexpr size_t BBOX_BUFFER_SIZE = sizeof(int) * 4;
+constexpr size_t BBOX_STREAM_BUFFER_SIZE = BBOX_BUFFER_SIZE * 128;
+
+static ID3D12Resource* s_bbox_buffer;
+static ID3D12Resource* s_bbox_staging_buffer;
+static void* s_bbox_staging_buffer_map;
+static std::unique_ptr<D3DStreamBuffer> s_bbox_stream_buffer;
+static D3D12_GPU_DESCRIPTOR_HANDLE s_bbox_descriptor_handle;
+
+void BBox::Init()
 {
-  if (m_gpu_descriptor)
-    g_dx_context->GetDescriptorHeapManager().Free(m_gpu_descriptor);
+	CD3DX12_RESOURCE_DESC buffer_desc(CD3DX12_RESOURCE_DESC::Buffer(BBOX_BUFFER_SIZE, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, 0));
+	CD3DX12_RESOURCE_DESC staging_buffer_desc(CD3DX12_RESOURCE_DESC::Buffer(BBOX_BUFFER_SIZE, D3D12_RESOURCE_FLAG_NONE, 0));
+
+	CheckHR(D3D::device12->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		&buffer_desc,
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+		nullptr,
+		IID_PPV_ARGS(&s_bbox_buffer)));
+
+	CheckHR(D3D::device12->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
+		D3D12_HEAP_FLAG_NONE,
+		&staging_buffer_desc,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		nullptr,
+		IID_PPV_ARGS(&s_bbox_staging_buffer)));
+
+	s_bbox_stream_buffer = std::make_unique<D3DStreamBuffer>(BBOX_STREAM_BUFFER_SIZE, BBOX_STREAM_BUFFER_SIZE, nullptr);
+
+	// D3D12 root signature UAV must be raw or structured buffers, not typed. Since we used a typed buffer,
+	// we have to use a descriptor table. Luckily, we only have to allocate this once, and it never changes.
+	D3D12_CPU_DESCRIPTOR_HANDLE cpu_descriptor_handle;
+	if (!D3D::gpu_descriptor_heap_mgr->Allocate(&cpu_descriptor_handle, &s_bbox_descriptor_handle, nullptr, false))
+		PanicAlert("Failed to create bounding box UAV descriptor");
+
+	D3D12_UNORDERED_ACCESS_VIEW_DESC view_desc = { DXGI_FORMAT_R32_SINT, D3D12_UAV_DIMENSION_BUFFER };
+	view_desc.Buffer.FirstElement = 0;
+	view_desc.Buffer.NumElements = 4;
+	view_desc.Buffer.StructureByteStride = 0;
+	view_desc.Buffer.CounterOffsetInBytes = 0;
+	view_desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+	D3D::device12->CreateUnorderedAccessView(s_bbox_buffer, nullptr, &view_desc, cpu_descriptor_handle);
+
+	Bind();
 }
 
-std::unique_ptr<BoundingBox> BoundingBox::Create()
+void BBox::Bind()
 {
-  auto bbox = std::unique_ptr<BoundingBox>(new BoundingBox());
-  if (!bbox->CreateBuffers())
-    return nullptr;
-
-  return bbox;
+	D3D::current_command_list->SetGraphicsRootDescriptorTable(DESCRIPTOR_TABLE_PS_UAV, s_bbox_descriptor_handle);
 }
 
-bool BoundingBox::CreateBuffers()
+void BBox::Invalidate()
 {
-  static constexpr D3D12_HEAP_PROPERTIES gpu_heap_properties = {D3D12_HEAP_TYPE_DEFAULT};
-  static constexpr D3D12_HEAP_PROPERTIES cpu_heap_properties = {D3D12_HEAP_TYPE_READBACK};
-  D3D12_RESOURCE_DESC buffer_desc = {D3D12_RESOURCE_DIMENSION_BUFFER,
-                                     0,
-                                     BUFFER_SIZE,
-                                     1,
-                                     1,
-                                     1,
-                                     DXGI_FORMAT_UNKNOWN,
-                                     {1, 0},
-                                     D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-                                     D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS};
+	if (!s_bbox_staging_buffer_map)
+		return;
 
-  HRESULT hr = g_dx_context->GetDevice()->CreateCommittedResource(
-      &gpu_heap_properties, D3D12_HEAP_FLAG_NONE, &buffer_desc,
-      D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_gpu_buffer));
-  CHECK(SUCCEEDED(hr), "Creating bounding box GPU buffer failed");
-  if (FAILED(hr) || !g_dx_context->GetDescriptorHeapManager().Allocate(&m_gpu_descriptor))
-    return false;
-
-  D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc = {DXGI_FORMAT_R32_SINT, D3D12_UAV_DIMENSION_BUFFER};
-  uav_desc.Buffer.NumElements = NUM_VALUES;
-  g_dx_context->GetDevice()->CreateUnorderedAccessView(m_gpu_buffer.Get(), nullptr, &uav_desc,
-                                                       m_gpu_descriptor.cpu_handle);
-
-  buffer_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
-  hr = g_dx_context->GetDevice()->CreateCommittedResource(
-      &cpu_heap_properties, D3D12_HEAP_FLAG_NONE, &buffer_desc, D3D12_RESOURCE_STATE_COPY_DEST,
-      nullptr, IID_PPV_ARGS(&m_readback_buffer));
-  CHECK(SUCCEEDED(hr), "Creating bounding box CPU buffer failed");
-  if (FAILED(hr))
-    return false;
-
-  if (!m_upload_buffer.AllocateBuffer(STREAM_BUFFER_SIZE))
-    return false;
-
-  // Both the CPU and GPU buffer's contents is unknown, so force a flush the first time.
-  m_values.fill(0);
-  m_dirty.fill(true);
-  m_valid = true;
-  return true;
+	D3D12_RANGE write_range = {};
+	s_bbox_staging_buffer->Unmap(0, &write_range);
+	s_bbox_staging_buffer_map = nullptr;
 }
 
-void BoundingBox::Readback()
+void BBox::Shutdown()
 {
-  // Copy from GPU->CPU buffer, and wait for the GPU to finish the copy.
-  ResourceBarrier(g_dx_context->GetCommandList(), m_gpu_buffer.Get(),
-                  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-  g_dx_context->GetCommandList()->CopyBufferRegion(m_readback_buffer.Get(), 0, m_gpu_buffer.Get(),
-                                                   0, BUFFER_SIZE);
-  ResourceBarrier(g_dx_context->GetCommandList(), m_gpu_buffer.Get(),
-                  D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-  Renderer::GetInstance()->ExecuteCommandList(true);
+	Invalidate();
 
-  // Read back to cached values.
-  static constexpr D3D12_RANGE read_range = {0, BUFFER_SIZE};
-  void* mapped_pointer;
-  HRESULT hr = m_readback_buffer->Map(0, &read_range, &mapped_pointer);
-  CHECK(SUCCEEDED(hr), "Map bounding box CPU buffer");
-  if (FAILED(hr))
-    return;
+	if (s_bbox_buffer)
+	{
+		D3D::command_list_mgr->DestroyResourceAfterCurrentCommandListExecuted(s_bbox_buffer);
+		s_bbox_buffer = nullptr;
+	}
 
-  static constexpr D3D12_RANGE write_range = {0, 0};
-  std::array<s32, NUM_VALUES> new_values;
-  std::memcpy(new_values.data(), mapped_pointer, BUFFER_SIZE);
-  m_readback_buffer->Unmap(0, &write_range);
+	if (s_bbox_staging_buffer)
+	{
+		D3D::command_list_mgr->DestroyResourceAfterCurrentCommandListExecuted(s_bbox_staging_buffer);
+		s_bbox_staging_buffer = nullptr;
+	}
 
-  // Preserve dirty values, that way we don't need to sync.
-  for (u32 i = 0; i < NUM_VALUES; i++)
-  {
-    if (!m_dirty[i])
-      m_values[i] = new_values[i];
-  }
-  m_valid = true;
+	s_bbox_stream_buffer.reset();
 }
 
-s32 BoundingBox::Get(size_t index)
+void BBox::Set(int index, int value)
 {
-  if (!m_valid)
-    Readback();
+	// If the buffer is currently mapped, compare the value, and update the staging buffer.
+	if (s_bbox_staging_buffer_map)
+	{
+		int current_value;
+		memcpy(&current_value, reinterpret_cast<u8*>(s_bbox_staging_buffer_map) + (index * sizeof(int)), sizeof(int));
+		if (current_value == value)
+		{
+			// Value hasn't changed. So skip updating completely.
+			return;
+		}
 
-  return m_values[index];
+		memcpy(reinterpret_cast<u8*>(s_bbox_staging_buffer_map) + (index * sizeof(int)), &value, sizeof(int));
+	}
+
+	s_bbox_stream_buffer->AllocateSpaceInBuffer(sizeof(int), sizeof(int));
+
+	// Allocate temporary bytes in upload buffer, then copy to real buffer.
+	memcpy(s_bbox_stream_buffer->GetCPUAddressOfCurrentAllocation(), &value, sizeof(int));
+	D3D::ResourceBarrier(D3D::current_command_list, s_bbox_buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	D3D::current_command_list->CopyBufferRegion(s_bbox_buffer, index * sizeof(int), s_bbox_stream_buffer->GetBuffer(), s_bbox_stream_buffer->GetOffsetOfCurrentAllocation(), sizeof(int));
+	D3D::ResourceBarrier(D3D::current_command_list, s_bbox_buffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 }
 
-void BoundingBox::Set(size_t index, s32 value)
+int BBox::Get(int index)
 {
-  m_values[index] = value;
-  m_dirty[index] = true;
+	if (!s_bbox_staging_buffer_map)
+	{
+		D3D::command_list_mgr->CPUAccessNotify();
+
+		// Copy from real buffer to staging buffer, then block until we have the results.
+		D3D::ResourceBarrier(D3D::current_command_list, s_bbox_buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+		D3D::current_command_list->CopyBufferRegion(s_bbox_staging_buffer, 0, s_bbox_buffer, 0, BBOX_BUFFER_SIZE);
+		D3D::ResourceBarrier(D3D::current_command_list, s_bbox_buffer, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+		D3D::command_list_mgr->ExecuteQueuedWork(true);
+
+		D3D12_RANGE read_range = { 0, BBOX_BUFFER_SIZE };
+		CheckHR(s_bbox_staging_buffer->Map(0, &read_range, &s_bbox_staging_buffer_map));
+	}
+
+	int value;
+	memcpy(&value, &reinterpret_cast<int*>(s_bbox_staging_buffer_map)[index], sizeof(int));
+	return value;
 }
 
-void BoundingBox::Invalidate()
-{
-  m_dirty.fill(false);
-  m_valid = false;
-}
-
-void BoundingBox::Flush()
-{
-  bool in_copy_state = false;
-  for (u32 start = 0; start < NUM_VALUES;)
-  {
-    if (!m_dirty[start])
-    {
-      start++;
-      continue;
-    }
-
-    u32 end = start + 1;
-    m_dirty[start] = false;
-    for (; end < NUM_VALUES; end++)
-    {
-      if (!m_dirty[end])
-        break;
-
-      m_dirty[end] = false;
-    }
-
-    const u32 copy_size = (end - start) * sizeof(ValueType);
-    if (!m_upload_buffer.ReserveMemory(copy_size, sizeof(ValueType)))
-    {
-      WARN_LOG(VIDEO, "Executing command list while waiting for space in bbox stream buffer");
-      Renderer::GetInstance()->ExecuteCommandList(false);
-      if (!m_upload_buffer.ReserveMemory(copy_size, sizeof(ValueType)))
-      {
-        PanicAlert("Failed to allocate bbox stream buffer space");
-        return;
-      }
-    }
-
-    const u32 upload_buffer_offset = m_upload_buffer.GetCurrentOffset();
-    std::memcpy(m_upload_buffer.GetCurrentHostPointer(), &m_values[start], copy_size);
-    m_upload_buffer.CommitMemory(copy_size);
-
-    if (!in_copy_state)
-    {
-      ResourceBarrier(g_dx_context->GetCommandList(), m_gpu_buffer.Get(),
-                      D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST);
-      in_copy_state = true;
-    }
-
-    g_dx_context->GetCommandList()->CopyBufferRegion(m_gpu_buffer.Get(), start * sizeof(ValueType),
-                                                     m_upload_buffer.GetBuffer(),
-                                                     upload_buffer_offset, copy_size);
-    start = end;
-  }
-
-  if (in_copy_state)
-  {
-    ResourceBarrier(g_dx_context->GetCommandList(), m_gpu_buffer.Get(),
-                    D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-  }
-}
-};  // namespace DX12
+};

@@ -9,47 +9,36 @@
 #include <utility>
 #include <vector>
 
-#include "InputCommon/ControllerInterface/ControllerInterface.h"
-
-namespace ControllerEmu
-{
-class EmulatedController;
-}
+class ControllerEmu;
 
 class InputConfig
 {
 public:
-  InputConfig(const std::string& ini_name, const std::string& gui_name,
-              const std::string& profile_name);
+	InputConfig(const std::string& ini_name, const std::string& gui_name, const std::string& profile_name)
+		: m_ini_name(ini_name), m_gui_name(gui_name), m_profile_name(profile_name)
+	{
+	}
 
-  ~InputConfig();
+	bool LoadConfig(bool isGC);
+	void SaveConfig();
 
-  bool LoadConfig(bool isGC);
-  void SaveConfig();
+	template <typename T, typename... Args>
+	void CreateController(Args&&... args)
+	{
+		m_controllers.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
+	}
 
-  template <typename T, typename... Args>
-  void CreateController(Args&&... args)
-  {
-    m_controllers.emplace_back(std::make_unique<T>(std::forward<Args>(args)...));
-  }
+	ControllerEmu* GetController(int index);
+	void ClearControllers();
+	bool ControllersNeedToBeCreated() const;
+	bool IsControllerControlledByGamepadDevice(int index) const;
 
-  ControllerEmu::EmulatedController* GetController(int index);
-  void ClearControllers();
-  bool ControllersNeedToBeCreated() const;
-  bool IsControllerControlledByGamepadDevice(int index) const;
-
-  std::string GetGUIName() const { return m_gui_name; }
-  std::string GetProfileName() const { return m_profile_name; }
-  std::size_t GetControllerCount() const;
-
-  // These should be used after creating all controllers and before clearing them, respectively.
-  void RegisterHotplugCallback();
-  void UnregisterHotplugCallback();
+	std::string GetGUIName() const { return m_gui_name; }
+	std::string GetProfileName() const { return m_profile_name; }
 
 private:
-  ControllerInterface::HotplugCallbackHandle m_hotplug_callback_handle;
-  std::vector<std::unique_ptr<ControllerEmu::EmulatedController>> m_controllers;
-  const std::string m_ini_name;
-  const std::string m_gui_name;
-  const std::string m_profile_name;
+	std::vector<std::unique_ptr<ControllerEmu>> m_controllers;
+	const std::string m_ini_name;
+	const std::string m_gui_name;
+	const std::string m_profile_name;
 };

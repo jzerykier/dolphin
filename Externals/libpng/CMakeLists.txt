@@ -1,4 +1,5 @@
-add_library(png STATIC
+# OUR SOURCES
+set(SRCS
   png.h
   pngconf.h
   png.c
@@ -17,17 +18,5 @@ add_library(png STATIC
   pngwtran.c
   pngwutil.c
 )
-
-target_include_directories(png
-PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-target_link_libraries(png PUBLIC z)
-
-if(NOT MSVC)
-  target_compile_options(png
-  PRIVATE
-    -Wno-self-assign
-  )
-endif()
+add_definitions(-Wno-self-assign)
+add_library(png STATIC ${SRCS})

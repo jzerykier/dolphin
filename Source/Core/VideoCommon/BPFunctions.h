@@ -2,25 +2,29 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+
 // ------------------------------------------
 // Video backend must define these functions
 // ------------------------------------------
 
 #pragma once
 
-#include "Common/MathUtil.h"
+#include "VideoCommon/VideoCommon.h"
 
 struct BPCmd;
 
 namespace BPFunctions
 {
+
 void FlushPipeline();
 void SetGenerationMode();
 void SetScissor();
-void SetViewport();
 void SetDepthMode();
 void SetBlendMode();
-void ClearScreen(const MathUtil::Rectangle<int>& rc);
+void SetDitherMode();
+void SetLogicOpMode();
+void SetColorMask();
+void ClearScreen(const EFBRectangle &rc);
 void OnPixelFormatChange();
-void SetInterlacingMode(const BPCmd& bp);
-}  // namespace BPFunctions
+void SetInterlacingMode(const BPCmd &bp);
+}

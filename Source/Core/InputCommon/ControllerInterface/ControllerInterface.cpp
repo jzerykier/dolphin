@@ -2,305 +2,273 @@
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
+#include "Common/Thread.h"
 #include "InputCommon/ControllerInterface/ControllerInterface.h"
 
-#include <algorithm>
-
-#include "Common/Logging/Log.h"
-#include "Core/HW/WiimoteReal/WiimoteReal.h"
-
-#ifdef CIFACE_USE_WIN32
-#include "InputCommon/ControllerInterface/Win32/Win32.h"
+#ifdef CIFACE_USE_XINPUT
+	#include "InputCommon/ControllerInterface/XInput/XInput.h"
+#endif
+#ifdef CIFACE_USE_DINPUT
+	#include "InputCommon/ControllerInterface/DInput/DInput.h"
 #endif
 #ifdef CIFACE_USE_XLIB
-#include "InputCommon/ControllerInterface/Xlib/XInput2.h"
+	#include "InputCommon/ControllerInterface/Xlib/Xlib.h"
+	#ifdef CIFACE_USE_X11_XINPUT2
+		#include "InputCommon/ControllerInterface/Xlib/XInput2.h"
+	#endif
 #endif
 #ifdef CIFACE_USE_OSX
-#include "InputCommon/ControllerInterface/OSX/OSX.h"
-#include "InputCommon/ControllerInterface/Quartz/Quartz.h"
+	#include "InputCommon/ControllerInterface/OSX/OSX.h"
 #endif
 #ifdef CIFACE_USE_SDL
-#include "InputCommon/ControllerInterface/SDL/SDL.h"
+	#include "InputCommon/ControllerInterface/SDL/SDL.h"
 #endif
 #ifdef CIFACE_USE_ANDROID
-#include "InputCommon/ControllerInterface/Android/Android.h"
+	#include "InputCommon/ControllerInterface/Android/Android.h"
 #endif
 #ifdef CIFACE_USE_EVDEV
-#include "InputCommon/ControllerInterface/evdev/evdev.h"
+	#include "InputCommon/ControllerInterface/evdev/evdev.h"
 #endif
 #ifdef CIFACE_USE_PIPES
-#include "InputCommon/ControllerInterface/Pipes/Pipes.h"
+	#include "InputCommon/ControllerInterface/Pipes/Pipes.h"
 #endif
-#ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
-#include "InputCommon/ControllerInterface/DualShockUDPClient/DualShockUDPClient.h"
-#endif
+
+using namespace ciface::ExpressionParser;
+
+namespace
+{
+const ControlState INPUT_DETECT_THRESHOLD = 0.55;
+}
 
 ControllerInterface g_controller_interface;
 
-void ControllerInterface::Initialize(const WindowSystemInfo& wsi)
+//
+// Init
+//
+// Detect devices and inputs outputs / will make refresh function later
+//
+void ControllerInterface::Initialize(void* const hwnd)
 {
-  if (m_is_init)
-    return;
+	if (m_is_init)
+		return;
 
-  m_wsi = wsi;
+	m_hwnd = hwnd;
 
-  // Allow backends to add devices as soon as they are initialized.
-  m_is_init = true;
-
-  m_is_populating_devices = true;
-
-#ifdef CIFACE_USE_WIN32
-  ciface::Win32::Init(wsi.render_window);
+#ifdef CIFACE_USE_DINPUT
+	ciface::DInput::Init(m_devices, (HWND)hwnd);
+#endif
+#ifdef CIFACE_USE_XINPUT
+	ciface::XInput::Init(m_devices);
 #endif
 #ifdef CIFACE_USE_XLIB
-// nothing needed
+	ciface::Xlib::Init(m_devices, hwnd);
+	#ifdef CIFACE_USE_X11_XINPUT2
+	ciface::XInput2::Init(m_devices, hwnd);
+	#endif
 #endif
 #ifdef CIFACE_USE_OSX
-  if (m_wsi.type == WindowSystemType::MacOS)
-    ciface::OSX::Init(wsi.render_window);
-// nothing needed for Quartz
+	ciface::OSX::Init(m_devices, hwnd);
 #endif
 #ifdef CIFACE_USE_SDL
-  ciface::SDL::Init();
+	ciface::SDL::Init(m_devices);
 #endif
 #ifdef CIFACE_USE_ANDROID
-// nothing needed
+	ciface::Android::Init(m_devices);
 #endif
 #ifdef CIFACE_USE_EVDEV
-  ciface::evdev::Init();
+	ciface::evdev::Init(m_devices);
 #endif
 #ifdef CIFACE_USE_PIPES
-// nothing needed
-#endif
-#ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
-  ciface::DualShockUDPClient::Init();
+	ciface::Pipes::Init(m_devices);
 #endif
 
-  RefreshDevices();
+	m_is_init = true;
 }
 
-void ControllerInterface::ChangeWindow(void* hwnd)
+void ControllerInterface::Reinitialize()
 {
-  if (!m_is_init)
-    return;
+	if (!m_is_init)
+		return;
 
-  if (m_wsi.render_window == hwnd)
-    return;
-
-  // This shouldn't use render_surface so no need to update it.
-  m_wsi.render_window = hwnd;
-  RefreshDevices();
+	Shutdown();
+	Initialize(m_hwnd);
 }
 
-void ControllerInterface::RefreshDevices()
-{
-  if (!m_is_init)
-    return;
-
-  {
-    std::lock_guard lk(m_devices_mutex);
-    m_devices.clear();
-  }
-
-  m_is_populating_devices = true;
-
-  // Make sure shared_ptr<Device> objects are released before repopulating.
-  InvokeDevicesChangedCallbacks();
-
-#ifdef CIFACE_USE_WIN32
-  ciface::Win32::PopulateDevices(m_wsi.render_window);
-#endif
-#ifdef CIFACE_USE_XLIB
-  if (m_wsi.type == WindowSystemType::X11)
-    ciface::XInput2::PopulateDevices(m_wsi.render_window);
-#endif
-#ifdef CIFACE_USE_OSX
-  if (m_wsi.type == WindowSystemType::MacOS)
-  {
-    ciface::OSX::PopulateDevices(m_wsi.render_window);
-    ciface::Quartz::PopulateDevices(m_wsi.render_window);
-  }
-#endif
-#ifdef CIFACE_USE_SDL
-  ciface::SDL::PopulateDevices();
-#endif
-#ifdef CIFACE_USE_ANDROID
-  ciface::Android::PopulateDevices();
-#endif
-#ifdef CIFACE_USE_EVDEV
-  ciface::evdev::PopulateDevices();
-#endif
-#ifdef CIFACE_USE_PIPES
-  ciface::Pipes::PopulateDevices();
-#endif
-#ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
-  ciface::DualShockUDPClient::PopulateDevices();
-#endif
-
-  WiimoteReal::ProcessWiimotePool();
-
-  m_is_populating_devices = false;
-  InvokeDevicesChangedCallbacks();
-}
-
-// Remove all devices and call library cleanup functions
+//
+// DeInit
+//
+// Remove all devices/ call library cleanup functions
+//
 void ControllerInterface::Shutdown()
 {
-  if (!m_is_init)
-    return;
+	if (!m_is_init)
+		return;
 
-  // Prevent additional devices from being added during shutdown.
-  m_is_init = false;
+	for (ciface::Core::Device* d : m_devices)
+	{
+		// Set outputs to ZERO before destroying device
+		for (ciface::Core::Device::Output* o : d->Outputs())
+			o->SetState(0);
 
-  {
-    std::lock_guard lk(m_devices_mutex);
+		// Delete device
+		delete d;
+	}
 
-    for (const auto& d : m_devices)
-    {
-      // Set outputs to ZERO before destroying device
-      for (ciface::Core::Device::Output* o : d->Outputs())
-        o->SetState(0);
-    }
+	m_devices.clear();
 
-    m_devices.clear();
-  }
-
-  // This will update control references so shared_ptr<Device>s are freed up
-  // BEFORE we shutdown the backends.
-  InvokeDevicesChangedCallbacks();
-
-#ifdef CIFACE_USE_WIN32
-  ciface::Win32::DeInit();
+#ifdef CIFACE_USE_XINPUT
+	ciface::XInput::DeInit();
+#endif
+#ifdef CIFACE_USE_DINPUT
+	// nothing needed
 #endif
 #ifdef CIFACE_USE_XLIB
-// nothing needed
+	// nothing needed
 #endif
 #ifdef CIFACE_USE_OSX
-  ciface::OSX::DeInit();
-  ciface::Quartz::DeInit();
+	ciface::OSX::DeInit();
 #endif
 #ifdef CIFACE_USE_SDL
-  ciface::SDL::DeInit();
+	// TODO: there seems to be some sort of memory leak with SDL, quit isn't freeing everything up
+	SDL_Quit();
 #endif
 #ifdef CIFACE_USE_ANDROID
-// nothing needed
+	// nothing needed
 #endif
-#ifdef CIFACE_USE_EVDEV
-  ciface::evdev::Shutdown();
-#endif
-#ifdef CIFACE_USE_DUALSHOCKUDPCLIENT
-  ciface::DualShockUDPClient::DeInit();
-#endif
+
+	m_is_init = false;
 }
 
-void ControllerInterface::AddDevice(std::shared_ptr<ciface::Core::Device> device)
-{
-  // If we are shutdown (or in process of shutting down) ignore this request:
-  if (!m_is_init)
-    return;
-
-  {
-    std::lock_guard lk(m_devices_mutex);
-
-    const auto is_id_in_use = [&device, this](int id) {
-      return std::any_of(m_devices.begin(), m_devices.end(), [&device, &id](const auto& d) {
-        return d->GetSource() == device->GetSource() && d->GetName() == device->GetName() &&
-               d->GetId() == id;
-      });
-    };
-
-    const auto preferred_id = device->GetPreferredId();
-    if (preferred_id.has_value() && !is_id_in_use(*preferred_id))
-    {
-      // Use the device's preferred ID if available.
-      device->SetId(*preferred_id);
-    }
-    else
-    {
-      // Find the first available ID to use.
-      int id = 0;
-      while (is_id_in_use(id))
-        ++id;
-
-      device->SetId(id);
-    }
-
-    NOTICE_LOG(SERIALINTERFACE, "Added device: %s", device->GetQualifiedName().c_str());
-    m_devices.emplace_back(std::move(device));
-  }
-
-  if (!m_is_populating_devices)
-    InvokeDevicesChangedCallbacks();
-}
-
-void ControllerInterface::RemoveDevice(std::function<bool(const ciface::Core::Device*)> callback)
-{
-  {
-    std::lock_guard lk(m_devices_mutex);
-    auto it = std::remove_if(m_devices.begin(), m_devices.end(), [&callback](const auto& dev) {
-      if (callback(dev.get()))
-      {
-        NOTICE_LOG(SERIALINTERFACE, "Removed device: %s", dev->GetQualifiedName().c_str());
-        return true;
-      }
-      return false;
-    });
-    m_devices.erase(it, m_devices.end());
-  }
-
-  if (!m_is_populating_devices)
-    InvokeDevicesChangedCallbacks();
-}
-
-// Update input for all devices if lock can be acquired without waiting.
+//
+// UpdateInput
+//
+// Update input for all devices
+//
 void ControllerInterface::UpdateInput()
 {
-  // Don't block the UI or CPU thread (to avoid a short but noticeable frame drop)
-  if (m_devices_mutex.try_lock())
-  {
-    std::lock_guard lk(m_devices_mutex, std::adopt_lock);
-    for (const auto& d : m_devices)
-      d->UpdateInput();
-  }
+	for (ciface::Core::Device* d : m_devices)
+		d->UpdateInput();
 }
 
-void ControllerInterface::SetAspectRatioAdjustment(float value)
+//
+// InputReference :: State
+//
+// Gets the state of an input reference
+// override function for ControlReference::State ...
+//
+ControlState ControllerInterface::InputReference::State( const ControlState ignore )
 {
-  m_aspect_ratio_adjustment = value;
+	if (parsed_expression)
+		return parsed_expression->GetValue() * range;
+	else
+		return 0.0;
 }
 
-Common::Vec2 ControllerInterface::GetWindowInputScale() const
+//
+// OutputReference :: State
+//
+// Set the state of all binded outputs
+// overrides ControlReference::State .. combined them so I could make the GUI simple / inputs == same as outputs one list
+// I was lazy and it works so watever
+//
+ControlState ControllerInterface::OutputReference::State(const ControlState state)
 {
-  const auto ar = m_aspect_ratio_adjustment.load();
-
-  if (ar > 1)
-    return {1.f, ar};
-  else
-    return {1 / ar, 1.f};
+	if (parsed_expression)
+		parsed_expression->SetValue(state);
+	return 0.0;
 }
 
-// Register a callback to be called when a device is added or removed (as from the input backends'
-// hotplug thread), or when devices are refreshed
-// Returns a handle for later removing the callback.
-ControllerInterface::HotplugCallbackHandle
-ControllerInterface::RegisterDevicesChangedCallback(std::function<void()> callback)
+//
+// UpdateReference
+//
+// Updates a controlreference's binded devices/controls
+// need to call this to re-parse a control reference's expression after changing it
+//
+void ControllerInterface::UpdateReference(ControllerInterface::ControlReference* ref
+	, const ciface::Core::DeviceQualifier& default_device) const
 {
-  std::lock_guard<std::mutex> lk(m_callbacks_mutex);
-  m_devices_changed_callbacks.emplace_back(std::move(callback));
-  return std::prev(m_devices_changed_callbacks.end());
+	delete ref->parsed_expression;
+	ref->parsed_expression = nullptr;
+
+	ControlFinder finder(*this, default_device, ref->is_input);
+	ref->parse_error = ParseExpression(ref->expression, finder, &ref->parsed_expression);
 }
 
-// Unregister a device callback.
-void ControllerInterface::UnregisterDevicesChangedCallback(const HotplugCallbackHandle& handle)
+//
+// InputReference :: Detect
+//
+// Wait for input on all binded devices
+// supports not detecting inputs that were held down at the time of Detect start,
+// which is useful for those crazy flightsticks that have certain buttons that are always held down
+// or some crazy axes or something
+// upon input, return pointer to detected Control
+// else return nullptr
+//
+ciface::Core::Device::Control* ControllerInterface::InputReference::Detect(const unsigned int ms, ciface::Core::Device* const device)
 {
-  std::lock_guard<std::mutex> lk(m_callbacks_mutex);
-  m_devices_changed_callbacks.erase(handle);
+	unsigned int time = 0;
+	std::vector<bool> states(device->Inputs().size());
+
+	if (device->Inputs().size() == 0)
+		return nullptr;
+
+	// get starting state of all inputs,
+	// so we can ignore those that were activated at time of Detect start
+	std::vector<ciface::Core::Device::Input*>::const_iterator
+		i = device->Inputs().begin(),
+		e = device->Inputs().end();
+	for (std::vector<bool>::iterator state = states.begin(); i != e; ++i)
+		*state++ = ((*i)->GetState() > (1 - INPUT_DETECT_THRESHOLD));
+
+	while (time < ms)
+	{
+		device->UpdateInput();
+		i = device->Inputs().begin();
+		for (std::vector<bool>::iterator state = states.begin(); i != e; ++i,++state)
+		{
+			// detected an input
+			if ((*i)->IsDetectable() && (*i)->GetState() > INPUT_DETECT_THRESHOLD)
+			{
+				// input was released at some point during Detect call
+				// return the detected input
+				if (false == *state)
+					return *i;
+			}
+			else if ((*i)->GetState() < (1 - INPUT_DETECT_THRESHOLD))
+			{
+				*state = false;
+			}
+		}
+		Common::SleepCurrentThread(10); time += 10;
+	}
+
+	// no input was detected
+	return nullptr;
 }
 
-// Invoke all callbacks that were registered
-void ControllerInterface::InvokeDevicesChangedCallbacks() const
+//
+// OutputReference :: Detect
+//
+// Totally different from the inputReference detect / I have them combined so it was simpler to make the GUI.
+// The GUI doesn't know the difference between an input and an output / it's odd but I was lazy and it was easy
+//
+// set all binded outputs to <range> power for x milliseconds return false
+//
+ciface::Core::Device::Control* ControllerInterface::OutputReference::Detect(const unsigned int ms, ciface::Core::Device* const device)
 {
-  std::lock_guard<std::mutex> lk(m_callbacks_mutex);
-  for (const auto& callback : m_devices_changed_callbacks)
-    callback();
+	// ignore device
+
+	// don't hang if we don't even have any controls mapped
+	if (BoundCount() > 0)
+	{
+		State(1);
+		unsigned int slept = 0;
+
+		// this loop is to make stuff like flashing keyboard LEDs work
+		while (ms > (slept += 10))
+			Common::SleepCurrentThread(10);
+
+		State(0);
+	}
+	return nullptr;
 }

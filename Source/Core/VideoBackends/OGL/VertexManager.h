@@ -4,56 +4,48 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-
-#include "Common/CommonTypes.h"
-#include "Common/GL/GLUtil.h"
 #include "VideoCommon/NativeVertexFormat.h"
 #include "VideoCommon/VertexManagerBase.h"
 
 namespace OGL
 {
-class StreamBuffer;
-class GLVertexFormat : public NativeVertexFormat
-{
-public:
-  GLVertexFormat(const PortableVertexDeclaration& vtx_decl);
-  ~GLVertexFormat();
+	class GLVertexFormat : public NativeVertexFormat
+	{
+	public:
+		GLVertexFormat(const PortableVertexDeclaration& vtx_decl);
+		~GLVertexFormat();
 
-  GLuint VAO;
-};
+		void SetupVertexPointers() override;
+
+		GLuint VAO;
+	};
 
 // Handles the OpenGL details of drawing lots of vertices quickly.
 // Other functionality is moving out.
-class VertexManager final : public VertexManagerBase
+class VertexManager : public VertexManagerBase
 {
 public:
-  VertexManager();
-  ~VertexManager() override;
+	VertexManager();
+	~VertexManager();
+	NativeVertexFormat* CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl) override;
+	void CreateDeviceObjects() override;
+	void DestroyDeviceObjects() override;
 
-  bool Initialize() override;
-
-  void UploadUtilityUniforms(const void* uniforms, u32 uniforms_size) override;
-  bool UploadTexelBuffer(const void* data, u32 data_size, TexelBufferFormat format,
-                         u32* out_offset) override;
-  bool UploadTexelBuffer(const void* data, u32 data_size, TexelBufferFormat format, u32* out_offset,
-                         const void* palette_data, u32 palette_size,
-                         TexelBufferFormat palette_format, u32* out_palette_offset) override;
-
-  GLuint GetVertexBufferHandle() const;
-  GLuint GetIndexBufferHandle() const;
-
+	// NativeVertexFormat use this
+	GLuint m_vertex_buffers;
+	GLuint m_index_buffers;
+	GLuint m_last_vao;
 protected:
-  void ResetBuffer(u32 vertex_stride) override;
-  void CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 num_indices, u32* out_base_vertex,
-                    u32* out_base_index) override;
-  void UploadUniforms() override;
+	void ResetBuffer(u32 stride) override;
 
 private:
-  std::unique_ptr<StreamBuffer> m_vertex_buffer;
-  std::unique_ptr<StreamBuffer> m_index_buffer;
-  std::unique_ptr<StreamBuffer> m_texel_buffer;
-  std::array<GLuint, NUM_TEXEL_BUFFER_FORMATS> m_texel_buffer_views{};
+	void Draw(u32 stride);
+	void vFlush(bool useDstAlpha) override;
+	void PrepareDrawBuffers(u32 stride);
+
+	// Alternative buffers in CPU memory for primatives we are going to discard.
+	std::vector<u8> m_cpu_v_buffer;
+	std::vector<u16> m_cpu_i_buffer;
 };
-}  // namespace OGL
+
+}

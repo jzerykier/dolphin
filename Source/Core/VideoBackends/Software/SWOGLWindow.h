@@ -5,35 +5,41 @@
 #pragma once
 
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "Common/CommonTypes.h"
-#include "Common/MathUtil.h"
-
-class AbstractTexture;
-class GLContext;
-struct WindowSystemInfo;
 
 class SWOGLWindow
 {
 public:
-  ~SWOGLWindow();
+	static void Init(void* window_handle);
+	static void Shutdown();
 
-  GLContext* GetContext() const { return m_gl_context.get(); }
-  bool IsHeadless() const;
+	// Will be printed on the *next* image
+	void PrintText(const std::string& text, int x, int y, u32 color);
 
-  // Image to show, will be swapped immediately
-  void ShowImage(const AbstractTexture* image, const MathUtil::Rectangle<int>& xfb_region);
+	// Image to show, will be swapped immediately
+	void ShowImage(u8* data, int stride, int width, int height, float aspect);
 
-  static std::unique_ptr<SWOGLWindow> Create(const WindowSystemInfo& wsi);
+	int PeekMessages();
+
+	static std::unique_ptr<SWOGLWindow> s_instance;
 
 private:
-  SWOGLWindow();
+	SWOGLWindow() {}
 
-  bool Initialize(const WindowSystemInfo& wsi);
+	void Prepare();
 
-  u32 m_image_program = 0;
-  u32 m_image_texture = 0;
-  u32 m_image_vao = 0;
+	struct TextData
+	{
+		std::string text;
+		int x, y;
+		u32 color;
+	};
+	std::vector<TextData> m_text;
 
-  std::unique_ptr<GLContext> m_gl_context;
+	bool m_init {false};
+
+	u32 m_image_program, m_image_texture, m_image_vao;
 };

@@ -5,12 +5,14 @@
 #pragma once
 
 #include "Common/CommonTypes.h"
-#include "VideoCommon/VertexLoader.h"
 
 class VertexLoader_Position
 {
 public:
-  static u32 GetSize(u64 type, u32 format, u32 elements);
+	// GetSize
+	static unsigned int GetSize(u64 _type, unsigned int _format, unsigned int _elements);
 
-  static TPipelineFunction GetFunction(u64 type, u32 format, u32 elements);
+	// GetFunction
+	static TPipelineFunction GetFunction(u64 _type, unsigned int _format, unsigned int _elements);
 };
+

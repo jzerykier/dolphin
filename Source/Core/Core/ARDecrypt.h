@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <string>
 #include <vector>
 
 #include "Common/CommonTypes.h"
@@ -12,6 +11,7 @@
 
 namespace ActionReplay
 {
-void DecryptARCode(std::vector<std::string> vCodes, std::vector<AREntry>* ops);
 
-}  // namespace ActionReplay
+void DecryptARCode(std::vector<std::string> vCodes, std::vector<AREntry> &ops);
+
+} //namespace

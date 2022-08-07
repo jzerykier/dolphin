@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="DiscExtractor">
-      <UniqueIdentifier>{51cdf366-d3fe-464a-9f89-c9f1592a6f1c}</UniqueIdentifier>
-    </Filter>
     <Filter Include="DiscScrubber">
       <UniqueIdentifier>{3873659a-9a30-4a58-af9e-8dad7d7eb627}</UniqueIdentifier>
     </Filter>
@@ -30,7 +27,10 @@
     <ClCompile Include="FileSystemGCWii.cpp">
       <Filter>FileSystem</Filter>
     </ClCompile>
-    <ClCompile Include="NANDImporter.cpp">
+    <ClCompile Include="WiiWad.cpp">
+      <Filter>NAND</Filter>
+    </ClCompile>
+    <ClCompile Include="NANDContentLoader.cpp">
       <Filter>NAND</Filter>
     </ClCompile>
     <ClCompile Include="Blob.cpp">
@@ -51,10 +51,16 @@
     <ClCompile Include="WbfsBlob.cpp">
       <Filter>Volume\Blob</Filter>
     </ClCompile>
-    <ClCompile Include="DirectoryBlob.cpp">
-      <Filter>Volume\Blob</Filter>
+    <ClCompile Include="FileMonitor.cpp">
+      <Filter>Volume</Filter>
     </ClCompile>
-    <ClCompile Include="VolumeFileBlobReader.cpp">
+    <ClCompile Include="VolumeCommon.cpp">
+      <Filter>Volume</Filter>
+    </ClCompile>
+    <ClCompile Include="VolumeCreator.cpp">
+      <Filter>Volume</Filter>
+    </ClCompile>
+    <ClCompile Include="VolumeDirectory.cpp">
       <Filter>Volume</Filter>
     </ClCompile>
     <ClCompile Include="VolumeGC.cpp">
@@ -63,43 +69,9 @@
     <ClCompile Include="VolumeWad.cpp">
       <Filter>Volume</Filter>
     </ClCompile>
-    <ClCompile Include="Enums.cpp">
+    <ClCompile Include="VolumeWiiCrypted.cpp">
       <Filter>Volume</Filter>
     </ClCompile>
-    <ClCompile Include="VolumeWii.cpp">
-      <Filter>Volume</Filter>
-    </ClCompile>
-    <ClCompile Include="Volume.cpp">
-      <Filter>Volume</Filter>
-    </ClCompile>
-    <ClCompile Include="TGCBlob.cpp">
-      <Filter>Volume\Blob</Filter>
-    </ClCompile>
-    <ClCompile Include="DiscExtractor.cpp">
-      <Filter>DiscExtractor</Filter>
-    </ClCompile>
-    <ClCompile Include="WiiSaveBanner.cpp">
-      <Filter>NAND</Filter>
-    </ClCompile>
-    <ClCompile Include="VolumeVerifier.cpp">
-      <Filter>Volume</Filter>
-    </ClCompile>
-    <ClCompile Include="WiiEncryptionCache.cpp">
-      <Filter>Volume\Blob</Filter>
-    </ClCompile>
-    <ClCompile Include="ScrubbedBlob.cpp">
-      <Filter>Volume\Blob</Filter>
-    </ClCompile>
-    <ClCompile Include="WIABlob.cpp">
-      <Filter>Volume\Blob</Filter>
-    </ClCompile>
-    <ClCompile Include="LaggedFibonacciGenerator.cpp">
-      <Filter>Volume\Blob</Filter>
-    </ClCompile>
-    <ClCompile Include="WIACompression.cpp">
-      <Filter>Volume\Blob</Filter>
-    </ClCompile>
-    <ClCompile Include="VolumeDisc.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DiscScrubber.h">
@@ -111,7 +83,10 @@
     <ClInclude Include="FileSystemGCWii.h">
       <Filter>FileSystem</Filter>
     </ClInclude>
-    <ClInclude Include="NANDImporter.h">
+    <ClInclude Include="WiiWad.h">
+      <Filter>NAND</Filter>
+    </ClInclude>
+    <ClInclude Include="NANDContentLoader.h">
       <Filter>NAND</Filter>
     </ClInclude>
     <ClInclude Include="Blob.h">
@@ -132,13 +107,16 @@
     <ClInclude Include="WbfsBlob.h">
       <Filter>Volume\Blob</Filter>
     </ClInclude>
+    <ClInclude Include="FileMonitor.h">
+      <Filter>Volume</Filter>
+    </ClInclude>
     <ClInclude Include="Volume.h">
       <Filter>Volume</Filter>
     </ClInclude>
-    <ClInclude Include="DirectoryBlob.h">
-      <Filter>Volume\Blob</Filter>
+    <ClInclude Include="VolumeCreator.h">
+      <Filter>Volume</Filter>
     </ClInclude>
-    <ClInclude Include="VolumeFileBlobReader.h">
+    <ClInclude Include="VolumeDirectory.h">
       <Filter>Volume</Filter>
     </ClInclude>
     <ClInclude Include="VolumeGC.h">
@@ -147,43 +125,9 @@
     <ClInclude Include="VolumeWad.h">
       <Filter>Volume</Filter>
     </ClInclude>
-    <ClInclude Include="VolumeWii.h">
+    <ClInclude Include="VolumeWiiCrypted.h">
       <Filter>Volume</Filter>
     </ClInclude>
-    <ClInclude Include="Enums.h">
-      <Filter>Volume</Filter>
-    </ClInclude>
-    <ClInclude Include="TGCBlob.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="DiscExtractor.h">
-      <Filter>DiscExtractor</Filter>
-    </ClInclude>
-    <ClInclude Include="WiiSaveBanner.h">
-      <Filter>NAND</Filter>
-    </ClInclude>
-    <ClInclude Include="VolumeVerifier.h">
-      <Filter>Volume</Filter>
-    </ClInclude>
-    <ClInclude Include="WiiEncryptionCache.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="ScrubbedBlob.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="MultithreadedCompressor.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="WIABlob.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="LaggedFibonacciGenerator.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="WIACompression.h">
-      <Filter>Volume\Blob</Filter>
-    </ClInclude>
-    <ClInclude Include="VolumeDisc.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="CMakeLists.txt" />

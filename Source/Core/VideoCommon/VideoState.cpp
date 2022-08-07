@@ -5,89 +5,70 @@
 #include <cstring>
 
 #include "Common/ChunkFile.h"
-#include "VideoCommon/BPMemory.h"
 #include "VideoCommon/BoundingBox.h"
-#include "VideoCommon/CPMemory.h"
+#include "VideoCommon/BPMemory.h"
 #include "VideoCommon/CommandProcessor.h"
+#include "VideoCommon/CPMemory.h"
 #include "VideoCommon/Fifo.h"
-#include "VideoCommon/FramebufferManager.h"
 #include "VideoCommon/GeometryShaderManager.h"
 #include "VideoCommon/PixelEngine.h"
 #include "VideoCommon/PixelShaderManager.h"
-#include "VideoCommon/RenderBase.h"
-#include "VideoCommon/TextureCacheBase.h"
 #include "VideoCommon/TextureDecoder.h"
 #include "VideoCommon/VertexManagerBase.h"
 #include "VideoCommon/VertexShaderManager.h"
 #include "VideoCommon/VideoState.h"
 #include "VideoCommon/XFMemory.h"
 
-void VideoCommon_DoState(PointerWrap& p)
+void VideoCommon_DoState(PointerWrap &p)
 {
-  bool software = false;
-  p.Do(software);
+	// BP Memory
+	p.Do(bpmem);
+	p.DoMarker("BP Memory");
 
-  if (p.GetMode() == PointerWrap::MODE_READ && software == true)
-  {
-    // change mode to abort load of incompatible save state.
-    p.SetMode(PointerWrap::MODE_VERIFY);
-  }
+	// CP Memory
+	DoCPState(p);
 
-  // BP Memory
-  p.Do(bpmem);
-  p.DoMarker("BP Memory");
+	// XF Memory
+	p.Do(xfmem);
+	p.DoMarker("XF Memory");
 
-  // CP Memory
-  DoCPState(p);
+	// Texture decoder
+	p.DoArray(texMem);
+	p.DoMarker("texMem");
 
-  // XF Memory
-  p.Do(xfmem);
-  p.DoMarker("XF Memory");
+	// FIFO
+	Fifo::DoState(p);
+	p.DoMarker("Fifo");
 
-  // Texture decoder
-  p.DoArray(texMem);
-  p.DoMarker("texMem");
+	CommandProcessor::DoState(p);
+	p.DoMarker("CommandProcessor");
 
-  // FIFO
-  Fifo::DoState(p);
-  p.DoMarker("Fifo");
+	PixelEngine::DoState(p);
+	p.DoMarker("PixelEngine");
 
-  CommandProcessor::DoState(p);
-  p.DoMarker("CommandProcessor");
+	// the old way of replaying current bpmem as writes to push side effects to pixel shader manager doesn't really work.
+	PixelShaderManager::DoState(p);
+	p.DoMarker("PixelShaderManager");
 
-  PixelEngine::DoState(p);
-  p.DoMarker("PixelEngine");
+	VertexShaderManager::DoState(p);
+	p.DoMarker("VertexShaderManager");
 
-  // the old way of replaying current bpmem as writes to push side effects to pixel shader manager
-  // doesn't really work.
-  PixelShaderManager::DoState(p);
-  p.DoMarker("PixelShaderManager");
+	GeometryShaderManager::DoState(p);
+	p.DoMarker("GeometryShaderManager");
 
-  VertexShaderManager::DoState(p);
-  p.DoMarker("VertexShaderManager");
+	VertexManagerBase::DoState(p);
+	p.DoMarker("VertexManager");
 
-  GeometryShaderManager::DoState(p);
-  p.DoMarker("GeometryShaderManager");
+	BoundingBox::DoState(p);
+	p.DoMarker("BoundingBox");
 
-  g_vertex_manager->DoState(p);
-  p.DoMarker("VertexManager");
 
-  BoundingBox::DoState(p);
-  p.DoMarker("BoundingBox");
+	// TODO: search for more data that should be saved and add it here
+}
 
-  g_framebuffer_manager->DoState(p);
-  p.DoMarker("FramebufferManager");
-
-  g_texture_cache->DoState(p);
-  p.DoMarker("TextureCache");
-
-  g_renderer->DoState(p);
-  p.DoMarker("Renderer");
-
-  // Refresh state.
-  if (p.GetMode() == PointerWrap::MODE_READ)
-  {
-    // Inform backend of new state from registers.
-    BPReload();
-  }
+void VideoCommon_Init()
+{
+	memset(&g_main_cp_state, 0, sizeof(g_main_cp_state));
+	memset(&g_preprocess_cp_state, 0, sizeof(g_preprocess_cp_state));
+	memset(texMem, 0, TMEM_SIZE);
 }

@@ -5,7 +5,8 @@
               android:layout_width="match_parent"
               android:layout_height="match_parent"
               android:background="@color/dolphin_blue_dark"
-              tools:layout_width="250dp">
+              tools:layout_width="250dp"
+    >
 
     <TextView
         android:id="@+id/text_game_title"
@@ -19,7 +20,8 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        >
 
         <LinearLayout
             android:id="@+id/layout_options"
@@ -28,44 +30,34 @@
             android:orientation="vertical">
 
             <Button
-                android:id="@+id/menu_pause_emulation"
-                android:text="@string/pause_emulation"
-                style="@style/InGameMenuOption"/>
-
-            <Button
-                android:id="@+id/menu_unpause_emulation"
-                android:text="@string/unpause_emulation"
-                style="@style/InGameMenuOption"
-                android:visibility="gone"/>
-
-            <Button
                 android:id="@+id/menu_take_screenshot"
-                android:text="@string/emulation_screenshot"
+                android:text="@string/overlay_screenshot"
                 style="@style/InGameMenuOption"/>
 
             <Button
                 android:id="@+id/menu_quicksave"
                 android:text="@string/emulation_quicksave"
-                style="@style/InGameMenuOption"
-                android:visibility="gone"/>
+                style="@style/InGameMenuOption"/>
 
             <Button
                 android:id="@+id/menu_quickload"
                 android:text="@string/emulation_quickload"
-                style="@style/InGameMenuOption"
-                android:visibility="gone"/>
+                style="@style/InGameMenuOption"/>
 
             <Button
                 android:id="@+id/menu_emulation_save_root"
-                android:text="@string/emulation_savestate"
-                style="@style/InGameMenuOption"
-                android:visibility="gone"/>
+                android:text="@string/overlay_savestate"
+                style="@style/InGameMenuOption"/>
 
             <Button
                 android:id="@+id/menu_emulation_load_root"
-                android:text="@string/emulation_loadstate"
-                style="@style/InGameMenuOption"
-                android:visibility="gone"/>
+                android:text="@string/overlay_loadstate"
+                style="@style/InGameMenuOption"/>
+
+            <Button
+                android:id="@+id/menu_ingame_settings"
+                android:text="@string/settings"
+                style="@style/InGameMenuOption"/>
 
             <Button
                 android:id="@+id/menu_refresh_wiimotes"
@@ -73,17 +65,10 @@
                 style="@style/InGameMenuOption"/>
 
             <Button
-                android:id="@+id/menu_change_disc"
-                android:text="@string/emulation_change_disc"
-                style="@style/InGameMenuOption"/>
-
-            <Button
                 android:id="@+id/menu_exit"
-                android:text="@string/emulation_exit"
+                android:text="@string/overlay_exit_emulation"
                 style="@style/InGameMenuOption"/>
 
         </LinearLayout>
-
     </ScrollView>
-
 </LinearLayout>

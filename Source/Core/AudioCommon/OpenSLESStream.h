@@ -13,14 +13,12 @@ class OpenSLESStream final : public SoundStream
 {
 #ifdef ANDROID
 public:
-  ~OpenSLESStream() override;
-  bool Init() override;
-  bool SetRunning(bool running) override { return running; }
-  void SetVolume(int volume) override;
-  static bool isValid() { return true; }
+	bool Start() override;
+	void Stop() override;
+	static bool isValid() { return true; }
 
 private:
-  std::thread thread;
-  Common::Event soundSyncEvent;
-#endif  // HAVE_OPENSL
+	std::thread thread;
+	Common::Event soundSyncEvent;
+#endif // HAVE_OPENSL
 };

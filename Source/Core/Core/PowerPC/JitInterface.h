@@ -5,69 +5,43 @@
 #pragma once
 
 #include <string>
-
-#include "Common/CommonTypes.h"
+#include "Common/ChunkFile.h"
 #include "Core/MachineContext.h"
-
-class CPUCoreBase;
-class PointerWrap;
-class JitBase;
-
-namespace PowerPC
-{
-enum class CPUCore;
-}
-
-namespace Profiler
-{
-struct ProfileStats;
-}
+#include "Core/PowerPC/CPUCoreBase.h"
+#include "Core/PowerPC/Profiler.h"
 
 namespace JitInterface
 {
-enum class ExceptionType
-{
-  FIFOWrite,
-  PairedQuantize,
-  SpeculativeConstants
-};
+	enum class ExceptionType
+	{
+		EXCEPTIONS_FIFO_WRITE,
+		EXCEPTIONS_PAIRED_QUANTIZE
+	};
 
-void DoState(PointerWrap& p);
+	void DoState(PointerWrap &p);
 
-CPUCoreBase* InitJitCore(PowerPC::CPUCore core);
-CPUCoreBase* GetCore();
+	CPUCoreBase *InitJitCore(int core);
+	void InitTables(int core);
+	CPUCoreBase *GetCore();
 
-// Debugging
-enum class ProfilingState
-{
-  Enabled,
-  Disabled
-};
+	// Debugging
+	void WriteProfileResults(const std::string& filename);
+	void GetProfileResults(ProfileStats* prof_stats);
+	int GetHostCode(u32* address, const u8** code, u32* code_size);
 
-void SetProfilingState(ProfilingState state);
-void WriteProfileResults(const std::string& filename);
-void GetProfileResults(Profiler::ProfileStats* prof_stats);
-int GetHostCode(u32* address, const u8** code, u32* code_size);
+	// Memory Utilities
+	bool HandleFault(uintptr_t access_address, SContext* ctx);
+	bool HandleStackFault();
 
-// Memory Utilities
-bool HandleFault(uintptr_t access_address, SContext* ctx);
-bool HandleStackFault();
+	// Clearing CodeCache
+	void ClearCache();
 
-// Clearing CodeCache
-void ClearCache();
+	void ClearSafe();
 
-// This clear is "safe" in the sense that it's okay to run from
-// inside a JIT'ed block: it clears the instruction cache, but not
-// the JIT'ed code.
-void ClearSafe();
+	// If "forced" is true, a recompile is being requested on code that hasn't been modified.
+	void InvalidateICache(u32 address, u32 size, bool forced);
 
-// If "forced" is true, a recompile is being requested on code that hasn't been modified.
-void InvalidateICache(u32 address, u32 size, bool forced);
+	void CompileExceptionCheck(ExceptionType type);
 
-void CompileExceptionCheck(ExceptionType type);
-
-/// used for the page fault unit test, don't use outside of tests!
-void SetJit(JitBase* jit);
-
-void Shutdown();
-}  // namespace JitInterface
+	void Shutdown();
+}

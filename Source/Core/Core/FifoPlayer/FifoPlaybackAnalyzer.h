@@ -7,16 +7,17 @@
 #include <string>
 #include <vector>
 
+#include "Core/FifoPlayer/FifoAnalyzer.h"
 #include "Core/FifoPlayer/FifoDataFile.h"
 
 struct AnalyzedFrameInfo
 {
-  std::vector<u32> objectStarts;
-  std::vector<u32> objectEnds;
-  std::vector<MemoryUpdate> memoryUpdates;
+	std::vector<u32> objectStarts;
+	std::vector<u32> objectEnds;
+	std::vector<MemoryUpdate> memoryUpdates;
 };
 
 namespace FifoPlaybackAnalyzer
 {
-void AnalyzeFrames(FifoDataFile* file, std::vector<AnalyzedFrameInfo>& frameInfo);
-}  // namespace FifoPlaybackAnalyzer
+	void AnalyzeFrames(FifoDataFile* file, std::vector<AnalyzedFrameInfo>& frameInfo);
+};

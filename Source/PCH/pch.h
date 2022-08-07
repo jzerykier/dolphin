@@ -31,14 +31,14 @@
 #endif
 #include <iomanip>
 #include <iostream>
-#include <limits.h>
 #include <limits>
+#include <limits.h>
 #include <list>
 #include <locale.h>
 #include <map>
 #include <math.h>
-#include <memory.h>
 #include <memory>
+#include <memory.h>
 #include <mutex>
 #include <numeric>
 #ifndef _WIN32
@@ -67,8 +67,8 @@
 
 #ifdef _WIN32
 
-#if _MSC_FULL_VER < 191426433
-#error Please update your build environment to the latest Visual Studio 2017!
+#if _MSC_FULL_VER < 190023918
+#error Please update your build environment to Visual Studio 2015 Update 2 or later!
 #endif
 
 #include <Windows.h>

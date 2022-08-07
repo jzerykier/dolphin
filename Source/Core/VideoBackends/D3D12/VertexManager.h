@@ -1,52 +1,48 @@
-// Copyright 2019 Dolphin Emulator Project
+// Copyright 2008 Dolphin Emulator Project
 // Licensed under GPLv2+
 // Refer to the license.txt file included.
 
 #pragma once
 
 #include <memory>
-#include "VideoBackends/D3D12/DescriptorHeapManager.h"
-#include "VideoBackends/D3D12/StreamBuffer.h"
 #include "VideoCommon/VertexManagerBase.h"
 
 namespace DX12
 {
+
+class D3DStreamBuffer;
+
 class VertexManager final : public VertexManagerBase
 {
 public:
-  VertexManager();
-  ~VertexManager();
+	VertexManager();
+	~VertexManager();
 
-  bool Initialize() override;
+	NativeVertexFormat* CreateNativeVertexFormat(const PortableVertexDeclaration& vtx_decl) override;
+	void CreateDeviceObjects() override;
+	void DestroyDeviceObjects() override;
 
-  void UploadUtilityUniforms(const void* uniforms, u32 uniforms_size) override;
-  bool UploadTexelBuffer(const void* data, u32 data_size, TexelBufferFormat format,
-                         u32* out_offset) override;
-  bool UploadTexelBuffer(const void* data, u32 data_size, TexelBufferFormat format, u32* out_offset,
-                         const void* palette_data, u32 palette_size,
-                         TexelBufferFormat palette_format, u32* out_palette_offset) override;
+	void SetIndexBuffer();
 
 protected:
-  void ResetBuffer(u32 vertex_stride) override;
-  void CommitBuffer(u32 num_vertices, u32 vertex_stride, u32 num_indices, u32* out_base_vertex,
-                    u32* out_base_index) override;
-  void UploadUniforms() override;
+	void ResetBuffer(u32 stride) override;
 
-  void UpdateVertexShaderConstants();
-  void UpdateGeometryShaderConstants();
-  void UpdatePixelShaderConstants();
+private:
+	void PrepareDrawBuffers(u32 stride);
+	void Draw(u32 stride);
+	void vFlush(bool use_dst_alpha) override;
 
-  // Allocates storage in the uniform buffer of the specified size. If this storage cannot be
-  // allocated immediately, the current command buffer will be submitted and all stage's
-  // constants will be re-uploaded. false will be returned in this case, otherwise true.
-  bool ReserveConstantStorage();
-  void UploadAllConstants();
+	u32 m_vertex_draw_offset;
+	u32 m_index_draw_offset;
 
-  StreamBuffer m_vertex_stream_buffer;
-  StreamBuffer m_index_stream_buffer;
-  StreamBuffer m_uniform_stream_buffer;
-  StreamBuffer m_texel_stream_buffer;
-  std::array<DescriptorHandle, NUM_TEXEL_BUFFER_FORMATS> m_texel_buffer_views = {};
+	std::unique_ptr<D3DStreamBuffer> m_vertex_stream_buffer;
+	std::unique_ptr<D3DStreamBuffer> m_index_stream_buffer;
+
+	bool m_vertex_stream_buffer_reallocated = false;
+	bool m_index_stream_buffer_reallocated = false;
+
+	std::vector<u8> m_index_cpu_buffer;
+	std::vector<u8> m_vertex_cpu_buffer;
 };
 
-}  // namespace DX12
+}  // namespace

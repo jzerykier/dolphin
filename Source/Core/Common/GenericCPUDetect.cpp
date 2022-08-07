@@ -6,11 +6,9 @@
 
 CPUInfo cpu_info;
 
-CPUInfo::CPUInfo()
-{
-}
+CPUInfo::CPUInfo() {}
 
 std::string CPUInfo::Summarize()
 {
-  return "Generic";
+	return "Generic";
 }

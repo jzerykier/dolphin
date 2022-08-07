@@ -7,17 +7,25 @@
 #include <string>
 #include "VideoCommon/VideoBackendBase.h"
 
+namespace MMIO { class Mapping; }
+
 namespace SW
 {
+
 class VideoSoftware : public VideoBackendBase
 {
-  bool Initialize(const WindowSystemInfo& wsi) override;
-  void Shutdown() override;
+	bool Initialize(void *window_handle) override;
+	void Shutdown() override;
 
-  std::string GetName() const override;
-  std::string GetDisplayName() const override;
-  std::optional<std::string> GetWarningMessage() const override;
+	std::string GetName() const override;
+	std::string GetDisplayName() const override;
 
-  void InitBackendInfo() override;
+	void Video_Prepare() override;
+	void Video_Cleanup() override;
+
+	void ShowConfig(void* parent) override;
+
+	unsigned int PeekMessages() override;
 };
-}  // namespace SW
+
+}

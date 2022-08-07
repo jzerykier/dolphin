@@ -6,7 +6,4 @@
 
 #include "Common/CommonTypes.h"
 
-namespace DSP
-{
 typedef u16 UDSPInstruction;
-}  // namespace DSP

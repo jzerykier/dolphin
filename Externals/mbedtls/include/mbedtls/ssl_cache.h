@@ -2,8 +2,7 @@
  * \file ssl_cache.h
  *
  * \brief SSL session cache implementation
- */
-/*
+ *
  *  Copyright (C) 2006-2015, ARM Limited, All Rights Reserved
  *  SPDX-License-Identifier: Apache-2.0
  *
@@ -23,12 +22,6 @@
  */
 #ifndef MBEDTLS_SSL_CACHE_H
 #define MBEDTLS_SSL_CACHE_H
-
-#if !defined(MBEDTLS_CONFIG_FILE)
-#include "config.h"
-#else
-#include MBEDTLS_CONFIG_FILE
-#endif
 
 #include "ssl.h"
 
@@ -67,7 +60,7 @@ typedef struct mbedtls_ssl_cache_entry mbedtls_ssl_cache_entry;
 struct mbedtls_ssl_cache_entry
 {
 #if defined(MBEDTLS_HAVE_TIME)
-    mbedtls_time_t timestamp;           /*!< entry timestamp    */
+    time_t timestamp;           /*!< entry timestamp    */
 #endif
     mbedtls_ssl_session session;        /*!< entry session      */
 #if defined(MBEDTLS_X509_CRT_PARSE_C)
@@ -128,7 +121,7 @@ void mbedtls_ssl_cache_set_timeout( mbedtls_ssl_cache_context *cache, int timeou
 #endif /* MBEDTLS_HAVE_TIME */
 
 /**
- * \brief          Set the maximum number of cache entries
+ * \brief          Set the cache timeout
  *                 (Default: MBEDTLS_SSL_CACHE_DEFAULT_MAX_ENTRIES (50))
  *
  * \param cache    SSL cache context

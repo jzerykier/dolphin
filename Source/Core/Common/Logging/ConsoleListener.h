@@ -6,14 +6,14 @@
 
 #include "Common/Logging/LogManager.h"
 
-class ConsoleListener : public Common::Log::LogListener
+class ConsoleListener : public LogListener
 {
 public:
-  ConsoleListener();
-  ~ConsoleListener();
+	ConsoleListener();
+	~ConsoleListener();
 
-  void Log(Common::Log::LOG_LEVELS level, const char* text) override;
+	void Log(LogTypes::LOG_LEVELS, const char* text) override;
 
 private:
-  bool m_use_color;
+	bool m_use_color;
 };

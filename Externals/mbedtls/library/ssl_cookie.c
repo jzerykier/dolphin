@@ -31,18 +31,22 @@
 
 #if defined(MBEDTLS_SSL_COOKIE_C)
 
+#include "mbedtls/ssl_cookie.h"
+#include "mbedtls/ssl_internal.h"
+
 #if defined(MBEDTLS_PLATFORM_C)
 #include "mbedtls/platform.h"
 #else
 #define mbedtls_calloc    calloc
-#define mbedtls_free      free
+#define mbedtls_free       free
 #endif
 
-#include "mbedtls/ssl_cookie.h"
-#include "mbedtls/ssl_internal.h"
-#include "mbedtls/platform_util.h"
-
 #include <string.h>
+
+/* Implementation that should never be optimized out by the compiler */
+static void mbedtls_zeroize( void *v, size_t n ) {
+    volatile unsigned char *p = v; while( n-- ) *p++ = 0;
+}
 
 /*
  * If DTLS is in use, then at least one of SHA-1, SHA-256, SHA-512 is
@@ -94,10 +98,10 @@ void mbedtls_ssl_cookie_free( mbedtls_ssl_cookie_ctx *ctx )
     mbedtls_md_free( &ctx->hmac_ctx );
 
 #if defined(MBEDTLS_THREADING_C)
-    mbedtls_mutex_free( &ctx->mutex );
+    mbedtls_mutex_init( &ctx->mutex );
 #endif
 
-    mbedtls_platform_zeroize( ctx, sizeof( mbedtls_ssl_cookie_ctx ) );
+    mbedtls_zeroize( ctx, sizeof( mbedtls_ssl_cookie_ctx ) );
 }
 
 int mbedtls_ssl_cookie_setup( mbedtls_ssl_cookie_ctx *ctx,
@@ -118,7 +122,7 @@ int mbedtls_ssl_cookie_setup( mbedtls_ssl_cookie_ctx *ctx,
     if( ret != 0 )
         return( ret );
 
-    mbedtls_platform_zeroize( key, sizeof( key ) );
+    mbedtls_zeroize( key, sizeof( key ) );
 
     return( 0 );
 }
@@ -168,7 +172,7 @@ int mbedtls_ssl_cookie_write( void *p_ctx,
         return( MBEDTLS_ERR_SSL_BUFFER_TOO_SMALL );
 
 #if defined(MBEDTLS_HAVE_TIME)
-    t = (unsigned long) mbedtls_time( NULL );
+    t = (unsigned long) time( NULL );
 #else
     t = ctx->serial++;
 #endif
@@ -238,7 +242,7 @@ int mbedtls_ssl_cookie_check( void *p_ctx,
         return( -1 );
 
 #if defined(MBEDTLS_HAVE_TIME)
-    cur_time = (unsigned long) mbedtls_time( NULL );
+    cur_time = (unsigned long) time( NULL );
 #else
     cur_time = ctx->serial;
 #endif
